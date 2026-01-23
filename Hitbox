@@ -1,0 +1,180 @@
+-- Hitbox Script
+-- Upload this to GitHub and use the raw link
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Get settings from global
+local HitboxSettings = getgenv().HitboxSettings
+if not HitboxSettings then
+    warn("HitboxSettings not found - load Combat GUI first")
+    return
+end
+
+local hitboxConnection = nil
+local originalHitboxSizes = {}
+local previewBox = nil
+
+local function isOnSameTeam(player)
+    if not HitboxSettings.TeamCheck then return false end
+    
+    if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+        return true
+    end
+    
+    return false
+end
+
+local function createPreviewBox()
+    if previewBox then return end
+    
+    previewBox = Instance.new("Part")
+    previewBox.Name = "HitboxPreview"
+    previewBox.Anchored = true
+    previewBox.CanCollide = false
+    previewBox.Material = Enum.Material.ForceField
+    previewBox.Color = Color3.fromRGB(255, 0, 0)
+    previewBox.Transparency = HitboxSettings.PreviewTransparency
+    previewBox.Size = Vector3.new(
+        HitboxSettings.HitboxX,
+        HitboxSettings.HitboxY,
+        HitboxSettings.HitboxZ
+    )
+    
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        previewBox.CFrame = hrp.CFrame * CFrame.new(
+            HitboxSettings.HitboxPosX,
+            HitboxSettings.HitboxPosY,
+            HitboxSettings.HitboxPosZ
+        )
+    end
+    
+    previewBox.Parent = workspace
+end
+
+local function updatePreviewBox()
+    if not previewBox then return end
+    
+    previewBox.Size = Vector3.new(
+        HitboxSettings.HitboxX,
+        HitboxSettings.HitboxY,
+        HitboxSettings.HitboxZ
+    )
+    previewBox.Transparency = HitboxSettings.PreviewTransparency
+    
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        previewBox.CFrame = hrp.CFrame * CFrame.new(
+            HitboxSettings.HitboxPosX,
+            HitboxSettings.HitboxPosY,
+            HitboxSettings.HitboxPosZ
+        )
+    end
+end
+
+local function removePreviewBox()
+    if previewBox then
+        previewBox:Destroy()
+        previewBox = nil
+    end
+end
+
+local function applyHitbox()
+    if not HitboxSettings.Enabled then return end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            if isOnSameTeam(player) then
+                if originalHitboxSizes[player] then
+                    for partName, originalSize in pairs(originalHitboxSizes[player]) do
+                        local part = player.Character:FindFirstChild(partName)
+                        if part and part:IsA("BasePart") then
+                            part.Size = originalSize
+                            part.Transparency = 0
+                            part.CanCollide = true
+                        end
+                    end
+                    originalHitboxSizes[player] = nil
+                end
+                continue
+            end
+            
+            local character = player.Character
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            
+            if hrp then
+                if not originalHitboxSizes[player] then
+                    originalHitboxSizes[player] = {}
+                end
+                
+                if not originalHitboxSizes[player]["HumanoidRootPart"] then
+                    originalHitboxSizes[player]["HumanoidRootPart"] = hrp.Size
+                end
+                
+                -- Apply hitbox with position offset
+                hrp.Size = Vector3.new(
+                    HitboxSettings.HitboxX,
+                    HitboxSettings.HitboxY,
+                    HitboxSettings.HitboxZ
+                )
+                hrp.Transparency = HitboxSettings.HitboxTransparency
+                hrp.CanCollide = false
+                
+                -- Apply position offset
+                hrp.CFrame = hrp.CFrame * CFrame.new(
+                    HitboxSettings.HitboxPosX,
+                    HitboxSettings.HitboxPosY,
+                    HitboxSettings.HitboxPosZ
+                )
+            end
+        end
+    end
+end
+
+local function restoreHitboxes()
+    for player, parts in pairs(originalHitboxSizes) do
+        if player.Character then
+            for partName, originalSize in pairs(parts) do
+                local part = player.Character:FindFirstChild(partName)
+                if part and part:IsA("BasePart") then
+                    part.Size = originalSize
+                    part.Transparency = 0
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+    originalHitboxSizes = {}
+end
+
+-- Main loop
+local function startHitbox()
+    if hitboxConnection then return end
+    
+    createPreviewBox()
+    
+    hitboxConnection = RunService.Heartbeat:Connect(function()
+        pcall(applyHitbox)
+        pcall(updatePreviewBox)
+    end)
+end
+
+local function stopHitbox()
+    if hitboxConnection then
+        hitboxConnection:Disconnect()
+        hitboxConnection = nil
+    end
+    removePreviewBox()
+    restoreHitboxes()
+end
+
+-- Export functions
+getgenv().HitboxControl = {
+    Start = startHitbox,
+    Stop = stopHitbox
+}
+
+print("Hitbox Script Loaded!")
+return true
