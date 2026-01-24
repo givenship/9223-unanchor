@@ -27,6 +27,7 @@ local function connectToSound(soundObj)
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
                 task.wait(0.05)
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                print("Defused!")
             end
         end)
     end
