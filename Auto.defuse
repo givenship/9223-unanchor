@@ -1,0 +1,95 @@
+-- Auto Defuse Script
+-- Upload this to GitHub and use the raw link
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Get settings from global
+local AutoDefuseSettings = getgenv().AutoDefuseSettings
+if not AutoDefuseSettings then
+    warn("AutoDefuseSettings not found - load Combat GUI first")
+    return
+end
+
+local soundConnections = {}
+
+-- Listen for DefuseChance sound
+local function connectToSound(soundObj)
+    if soundObj:IsA("Sound") and soundObj.Name == "DefuseChance" then
+        if soundConnections[soundObj] then return end
+        
+        print("Found DefuseChance sound - Setting up auto click")
+        
+        soundConnections[soundObj] = soundObj.Played:Connect(function()
+            if AutoDefuseSettings.Enabled then
+                print("DefuseChance sound played - Auto clicking NOW")
+                -- Simulate left mouse button click
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                task.wait(0.05)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            end
+        end)
+    end
+end
+
+-- Scan for existing sounds
+local function scanForSounds(parent)
+    for _, obj in pairs(parent:GetDescendants()) do
+        pcall(function()
+            connectToSound(obj)
+        end)
+    end
+end
+
+-- Setup monitoring
+local function setupAutoDefuse()
+    local success, err = pcall(function()
+        -- Check if path exists
+        if not ReplicatedStorage:FindFirstChild("Assets") then
+            warn("ReplicatedStorage.Assets not found")
+            return
+        end
+        
+        local assets = ReplicatedStorage.Assets
+        if not assets:FindFirstChild("Sounds") then
+            warn("ReplicatedStorage.Assets.Sounds not found")
+            return
+        end
+        
+        local sounds = assets.Sounds
+        
+        -- Scan existing sounds
+        scanForSounds(sounds)
+        
+        -- Monitor for new sounds
+        sounds.DescendantAdded:Connect(function(child)
+            pcall(function()
+                connectToSound(child)
+            end)
+        end)
+        
+        print("Auto Defuse monitoring active")
+    end)
+    
+    if not success then
+        warn("Auto Defuse setup failed: " .. tostring(err))
+    end
+end
+
+-- Start monitoring
+setupAutoDefuse()
+
+-- Export control functions
+getgenv().AutoDefuseControl = {
+    Start = function()
+        AutoDefuseSettings.Enabled = true
+        print("Auto Defuse enabled")
+    end,
+    Stop = function()
+        AutoDefuseSettings.Enabled = false
+        print("Auto Defuse disabled")
+    end
+}
+
+print("Auto Defuse Script Loaded!")
+return true
