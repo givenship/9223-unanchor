@@ -1,6 +1,8 @@
 -- Combat Module - Main GUI
 -- Loads Hitbox and Aimlock scripts from GitHub
 
+print("sybau")
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -542,4 +544,3 @@ end
 
 return CombatModule
 
-print("sybau")
