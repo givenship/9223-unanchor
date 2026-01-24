@@ -45,12 +45,15 @@ local function createPreviewBox()
     
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
-        -- Show preview with offset
-        previewBox.CFrame = hrp.CFrame * CFrame.new(
-            HitboxSettings.HitboxPosX,
-            HitboxSettings.HitboxPosY,
-            HitboxSettings.HitboxPosZ
-        )
+        if HitboxSettings.UsePositionOffset then
+            previewBox.CFrame = hrp.CFrame * CFrame.new(
+                HitboxSettings.HitboxPosX,
+                HitboxSettings.HitboxPosY,
+                HitboxSettings.HitboxPosZ
+            )
+        else
+            previewBox.CFrame = hrp.CFrame * CFrame.new(5, 0, 0)
+        end
     end
     
     previewBox.Parent = workspace
@@ -68,12 +71,15 @@ local function updatePreviewBox()
     
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
-        -- Update preview position with offset
-        previewBox.CFrame = hrp.CFrame * CFrame.new(
-            HitboxSettings.HitboxPosX,
-            HitboxSettings.HitboxPosY,
-            HitboxSettings.HitboxPosZ
-        )
+        if HitboxSettings.UsePositionOffset then
+            previewBox.CFrame = hrp.CFrame * CFrame.new(
+                HitboxSettings.HitboxPosX,
+                HitboxSettings.HitboxPosY,
+                HitboxSettings.HitboxPosZ
+            )
+        else
+            previewBox.CFrame = hrp.CFrame * CFrame.new(5, 0, 0)
+        end
     end
 end
 
@@ -84,8 +90,8 @@ local function removePreviewBox()
     end
 end
 
+-- Position offset mode (alternative, not recommended)
 local function createCustomHitbox(player, character)
-    -- Remove old custom hitbox if exists
     if customHitboxParts[player] then
         customHitboxParts[player]:Destroy()
         customHitboxParts[player] = nil
@@ -94,7 +100,6 @@ local function createCustomHitbox(player, character)
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Create invisible offset hitbox part
     local customHitbox = Instance.new("Part")
     customHitbox.Name = "CustomHitbox"
     customHitbox.Size = Vector3.new(
@@ -103,19 +108,21 @@ local function createCustomHitbox(player, character)
         HitboxSettings.HitboxZ
     )
     customHitbox.Transparency = HitboxSettings.HitboxTransparency
-    customHitbox.CanCollide = false  -- Don't collide with anything
+    customHitbox.CanCollide = false
     customHitbox.Anchored = false
     customHitbox.Massless = true
     customHitbox.Material = Enum.Material.ForceField
     customHitbox.Color = Color3.fromRGB(255, 0, 0)
-    
-    -- Make it not affect physics at all
     customHitbox.CanQuery = false
     customHitbox.CanTouch = false
     
-    -- Create alignment to follow HRP with offset
     local attachment0 = Instance.new("Attachment")
     attachment0.Parent = hrp
+    attachment0.Position = Vector3.new(
+        HitboxSettings.HitboxPosX,
+        HitboxSettings.HitboxPosY,
+        HitboxSettings.HitboxPosZ
+    )
     
     local attachment1 = Instance.new("Attachment")
     attachment1.Parent = customHitbox
@@ -136,20 +143,12 @@ local function createCustomHitbox(player, character)
     alignOrientation.Responsiveness = 200
     alignOrientation.Parent = customHitbox
     
-    -- Set offset position on the attachment
-    attachment0.Position = Vector3.new(
-        HitboxSettings.HitboxPosX,
-        HitboxSettings.HitboxPosY,
-        HitboxSettings.HitboxPosZ
-    )
-    
     customHitbox.Parent = character
     customHitboxParts[player] = {
         part = customHitbox,
         attachment = attachment0
     }
     
-    -- Store original HRP size
     if not originalHitboxSizes[player] then
         originalHitboxSizes[player] = hrp.Size
     end
@@ -162,9 +161,6 @@ local function removeCustomHitbox(player)
         end
         customHitboxParts[player] = nil
     end
-    
-    -- Restore original HRP (no need since we don't modify it anymore)
-    originalHitboxSizes[player] = nil
 end
 
 local function updateCustomHitbox(player, character)
@@ -176,17 +172,13 @@ local function updateCustomHitbox(player, character)
     local customHitbox = customHitboxParts[player].part
     local attachment = customHitboxParts[player].attachment
     
-    -- Update size
     customHitbox.Size = Vector3.new(
         HitboxSettings.HitboxX,
         HitboxSettings.HitboxY,
         HitboxSettings.HitboxZ
     )
-    
-    -- Update transparency
     customHitbox.Transparency = HitboxSettings.HitboxTransparency
     
-    -- Update position offset via attachment
     attachment.Position = Vector3.new(
         HitboxSettings.HitboxPosX,
         HitboxSettings.HitboxPosY,
@@ -200,7 +192,18 @@ local function applyHitbox()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             if isOnSameTeam(player) then
-                removeCustomHitbox(player)
+                -- Restore original
+                if HitboxSettings.UsePositionOffset then
+                    removeCustomHitbox(player)
+                elseif originalHitboxSizes[player] then
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.Size = originalHitboxSizes[player]
+                        hrp.Transparency = 0
+                        hrp.CanCollide = true
+                    end
+                    originalHitboxSizes[player] = nil
+                end
                 continue
             end
             
@@ -208,12 +211,26 @@ local function applyHitbox()
             local hrp = character:FindFirstChild("HumanoidRootPart")
             
             if hrp then
-                -- Create custom hitbox if doesn't exist
-                if not customHitboxParts[player] then
-                    createCustomHitbox(player, character)
+                if HitboxSettings.UsePositionOffset then
+                    -- Use position offset mode (not recommended)
+                    if not customHitboxParts[player] then
+                        createCustomHitbox(player, character)
+                    else
+                        updateCustomHitbox(player, character)
+                    end
                 else
-                    -- Update existing hitbox
-                    updateCustomHitbox(player, character)
+                    -- Use normal expansion mode (recommended)
+                    if not originalHitboxSizes[player] then
+                        originalHitboxSizes[player] = hrp.Size
+                    end
+                    
+                    hrp.Size = Vector3.new(
+                        HitboxSettings.HitboxX,
+                        HitboxSettings.HitboxY,
+                        HitboxSettings.HitboxZ
+                    )
+                    hrp.Transparency = HitboxSettings.HitboxTransparency
+                    hrp.CanCollide = false
                 end
             end
         end
@@ -221,11 +238,24 @@ local function applyHitbox()
 end
 
 local function restoreHitboxes()
+    -- Restore normal hitboxes
+    for player, originalSize in pairs(originalHitboxSizes) do
+        if player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Size = originalSize
+                hrp.Transparency = 0
+                hrp.CanCollide = true
+            end
+        end
+    end
+    originalHitboxSizes = {}
+    
+    -- Remove custom hitboxes
     for player, _ in pairs(customHitboxParts) do
         removeCustomHitbox(player)
     end
     customHitboxParts = {}
-    originalHitboxSizes = {}
 end
 
 -- Main loop
