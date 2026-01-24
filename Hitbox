@@ -28,31 +28,25 @@ local function isOnSameTeam(player)
 end
 
 local function calculateHitboxSize()
-    -- Get values based on selected mode
-    local sizeX = 2 -- Base size
-    local sizeY = 2
-    local sizeZ = 1
+    -- Base HumanoidRootPart size
+    local baseSize = Vector3.new(2, 2, 1)
     
-    -- Apply directional expansion based on mode
-    if HitboxSettings.HitboxXMode == "left" then
-        sizeX = sizeX + HitboxSettings.HitboxLeft
-    else -- right
-        sizeX = sizeX + HitboxSettings.HitboxRight
-    end
+    -- Calculate total expansion for each axis
+    local totalX = baseSize.X + HitboxSettings.HitboxLeft + HitboxSettings.HitboxRight
+    local totalY = baseSize.Y + HitboxSettings.HitboxUp + HitboxSettings.HitboxDown
+    local totalZ = baseSize.Z + HitboxSettings.HitboxFront + HitboxSettings.HitboxBack
     
-    if HitboxSettings.HitboxYMode == "up" then
-        sizeY = sizeY + HitboxSettings.HitboxUp
-    else -- down
-        sizeY = sizeY + HitboxSettings.HitboxDown
-    end
+    return Vector3.new(totalX, totalY, totalZ)
+end
+
+local function calculateHitboxOffset()
+    -- Calculate offset needed to keep character centered
+    -- Offset = (Right - Left) / 2 for X axis, etc.
+    local offsetX = (HitboxSettings.HitboxRight - HitboxSettings.HitboxLeft) / 2
+    local offsetY = (HitboxSettings.HitboxUp - HitboxSettings.HitboxDown) / 2
+    local offsetZ = (HitboxSettings.HitboxFront - HitboxSettings.HitboxBack) / 2
     
-    if HitboxSettings.HitboxZMode == "front" then
-        sizeZ = sizeZ + HitboxSettings.HitboxFront
-    else -- back
-        sizeZ = sizeZ + HitboxSettings.HitboxBack
-    end
-    
-    return Vector3.new(sizeX, sizeY, sizeZ)
+    return Vector3.new(offsetX, offsetY, offsetZ)
 end
 
 local function createPreviewBox()
@@ -236,9 +230,17 @@ local function applyHitbox()
                         originalHitboxSizes[player] = hrp.Size
                     end
                     
+                    -- Store original CFrame
+                    local originalCFrame = hrp.CFrame
+                    
+                    -- Apply new size
                     hrp.Size = calculateHitboxSize()
                     hrp.Transparency = HitboxSettings.HitboxTransparency
                     hrp.CanCollide = false
+                    
+                    -- Apply offset to keep character visually centered
+                    local offset = calculateHitboxOffset()
+                    hrp.CFrame = originalCFrame * CFrame.new(offset)
                 end
             end
         end
