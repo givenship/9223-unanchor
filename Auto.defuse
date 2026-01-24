@@ -16,16 +16,24 @@ end
 local animationConnections = {}
 local monitorConnection = nil
 
--- Target animation IDs
+-- Target animation IDs (multiple formats to catch all)
 local DEFUSE_ANIMATIONS = {
+    "99918936475651",
+    "115241304811827",
     "rbxassetid://99918936475651",
-    "rbxassetid://115241304811827"
+    "rbxassetid://115241304811827",
+    "http://www.roblox.com/asset/?id=99918936475651",
+    "http://www.roblox.com/asset/?id=115241304811827"
 }
 
 -- Check if animation ID matches defuse animations
 local function isDefuseAnimation(animationId)
+    if not animationId then return false end
+    
+    print("Animation detected: " .. animationId)
+    
     for _, targetId in pairs(DEFUSE_ANIMATIONS) do
-        if animationId == targetId then
+        if animationId:find(targetId) or targetId:find(animationId:match("%d+") or "") then
             return true
         end
     end
@@ -52,21 +60,38 @@ local function monitorCharacter(character)
     if not humanoid then return end
     
     local animator = humanoid:FindFirstChildOfClass("Animator")
-    if not animator then return end
+    if not animator then 
+        print("No animator found for: " .. character.Name)
+        return 
+    end
+    
+    print("Monitoring character: " .. character.Name)
     
     -- Connect to AnimationPlayed event
     animationConnections[character] = animator.AnimationPlayed:Connect(function(animationTrack)
         if not AutoDefuseSettings.Enabled then return end
         
+        local player = Players:GetPlayerFromCharacter(character)
+        local distance = getDistance(character)
+        
+        print("Animation played by: " .. character.Name .. " Distance: " .. math.floor(distance) .. " studs")
+        
         -- Check distance (30 studs)
-        if getDistance(character) > 30 then return end
+        if distance > 30 then 
+            print("Too far away: " .. math.floor(distance) .. " studs")
+            return 
+        end
         
         -- Get animation ID
         local animationId = animationTrack.Animation and animationTrack.Animation.AnimationId
-        if not animationId then return end
+        if not animationId then 
+            print("No animation ID found")
+            return 
+        end
         
         -- Check if it's a defuse animation
         if isDefuseAnimation(animationId) then
+            print("DEFUSE ANIMATION DETECTED! Waiting " .. (AutoDefuseSettings.Delay or 3) .. " seconds...")
             -- Wait for delay (from slider)
             task.wait(AutoDefuseSettings.Delay or 3)
             print("Defused")
@@ -120,6 +145,7 @@ local function startMonitoring()
     end)
     
     print("Auto Defuse monitoring animations")
+    print("Watching for animation IDs: 99918936475651, 115241304811827")
 end
 
 local function stopMonitoring()
