@@ -40,11 +40,19 @@ local function calculateHitboxSize()
 end
 
 local function calculateHitboxOffset()
-    -- Calculate offset needed to keep character centered
-    -- Offset = (Right - Left) / 2 for X axis, etc.
+    -- Calculate offset to shift hitbox in the correct direction
+    -- If Left=10, Right=0: need to shift LEFT by 5 (half of 10)
+    -- If Left=0, Right=10: need to shift RIGHT by 5 (half of 10)
+    -- Formula: offset = (expansion in positive direction - expansion in negative direction) / 2
+    
+    -- X axis: Right is positive, Left is negative
     local offsetX = (HitboxSettings.HitboxRight - HitboxSettings.HitboxLeft) / 2
+    
+    -- Y axis: Up is positive, Down is negative
     local offsetY = (HitboxSettings.HitboxUp - HitboxSettings.HitboxDown) / 2
-    local offsetZ = (HitboxSettings.HitboxFront - HitboxSettings.HitboxBack) / 2
+    
+    -- Z axis: Front is negative (forward in Roblox), Back is positive
+    local offsetZ = (HitboxSettings.HitboxBack - HitboxSettings.HitboxFront) / 2
     
     return Vector3.new(offsetX, offsetY, offsetZ)
 end
@@ -107,7 +115,9 @@ end
 -- Position offset mode (alternative, not recommended)
 local function createCustomHitbox(player, character)
     if customHitboxParts[player] then
-        customHitboxParts[player]:Destroy()
+        if customHitboxParts[player].part then
+            customHitboxParts[player].part:Destroy()
+        end
         customHitboxParts[player] = nil
     end
     
@@ -118,21 +128,26 @@ local function createCustomHitbox(player, character)
     customHitbox.Name = "CustomHitbox"
     customHitbox.Size = calculateHitboxSize()
     customHitbox.Transparency = HitboxSettings.HitboxTransparency
-    customHitbox.CanCollide = false
+    customHitbox.CanCollide = true
     customHitbox.Anchored = false
     customHitbox.Massless = true
     customHitbox.Material = Enum.Material.ForceField
     customHitbox.Color = Color3.fromRGB(255, 0, 0)
-    customHitbox.CanQuery = false
-    customHitbox.CanTouch = false
     
     local attachment0 = Instance.new("Attachment")
     attachment0.Parent = hrp
-    attachment0.Position = Vector3.new(
-        HitboxSettings.HitboxPosX,
-        HitboxSettings.HitboxPosY,
-        HitboxSettings.HitboxPosZ
-    )
+    
+    if HitboxSettings.UsePositionOffset then
+        -- Position offset mode uses manual offset
+        attachment0.Position = Vector3.new(
+            HitboxSettings.HitboxPosX,
+            HitboxSettings.HitboxPosY,
+            HitboxSettings.HitboxPosZ
+        )
+    else
+        -- Normal mode uses calculated directional offset
+        attachment0.Position = calculateHitboxOffset()
+    end
     
     local attachment1 = Instance.new("Attachment")
     attachment1.Parent = customHitbox
@@ -162,6 +177,10 @@ local function createCustomHitbox(player, character)
     if not originalHitboxSizes[player] then
         originalHitboxSizes[player] = hrp.Size
     end
+    
+    -- Make original HRP invisible and non-collidable
+    hrp.Transparency = 1
+    hrp.CanCollide = false
 end
 
 local function removeCustomHitbox(player)
@@ -170,6 +189,16 @@ local function removeCustomHitbox(player)
             customHitboxParts[player].part:Destroy()
         end
         customHitboxParts[player] = nil
+    end
+    
+    -- Restore HRP
+    if player.Character then
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and originalHitboxSizes[player] then
+            hrp.Transparency = 0
+            hrp.CanCollide = true
+            hrp.Size = originalHitboxSizes[player]
+        end
     end
 end
 
@@ -185,11 +214,15 @@ local function updateCustomHitbox(player, character)
     customHitbox.Size = calculateHitboxSize()
     customHitbox.Transparency = HitboxSettings.HitboxTransparency
     
-    attachment.Position = Vector3.new(
-        HitboxSettings.HitboxPosX,
-        HitboxSettings.HitboxPosY,
-        HitboxSettings.HitboxPosZ
-    )
+    if HitboxSettings.UsePositionOffset then
+        attachment.Position = Vector3.new(
+            HitboxSettings.HitboxPosX,
+            HitboxSettings.HitboxPosY,
+            HitboxSettings.HitboxPosZ
+        )
+    else
+        attachment.Position = calculateHitboxOffset()
+    end
 end
 
 local function applyHitbox()
@@ -198,18 +231,7 @@ local function applyHitbox()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             if isOnSameTeam(player) then
-                -- Restore original
-                if HitboxSettings.UsePositionOffset then
-                    removeCustomHitbox(player)
-                elseif originalHitboxSizes[player] then
-                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        hrp.Size = originalHitboxSizes[player]
-                        hrp.Transparency = 0
-                        hrp.CanCollide = true
-                    end
-                    originalHitboxSizes[player] = nil
-                end
+                removeCustomHitbox(player)
                 continue
             end
             
@@ -217,30 +239,11 @@ local function applyHitbox()
             local hrp = character:FindFirstChild("HumanoidRootPart")
             
             if hrp then
-                if HitboxSettings.UsePositionOffset then
-                    -- Use position offset mode (not recommended)
-                    if not customHitboxParts[player] then
-                        createCustomHitbox(player, character)
-                    else
-                        updateCustomHitbox(player, character)
-                    end
+                -- Always use custom hitbox part for directional control
+                if not customHitboxParts[player] then
+                    createCustomHitbox(player, character)
                 else
-                    -- Use normal expansion mode (recommended)
-                    if not originalHitboxSizes[player] then
-                        originalHitboxSizes[player] = hrp.Size
-                    end
-                    
-                    -- Store original CFrame
-                    local originalCFrame = hrp.CFrame
-                    
-                    -- Apply new size
-                    hrp.Size = calculateHitboxSize()
-                    hrp.Transparency = HitboxSettings.HitboxTransparency
-                    hrp.CanCollide = false
-                    
-                    -- Apply offset to keep character visually centered
-                    local offset = calculateHitboxOffset()
-                    hrp.CFrame = originalCFrame * CFrame.new(offset)
+                    updateCustomHitbox(player, character)
                 end
             end
         end
@@ -248,24 +251,12 @@ local function applyHitbox()
 end
 
 local function restoreHitboxes()
-    -- Restore normal hitboxes
-    for player, originalSize in pairs(originalHitboxSizes) do
-        if player.Character then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.Size = originalSize
-                hrp.Transparency = 0
-                hrp.CanCollide = true
-            end
-        end
-    end
-    originalHitboxSizes = {}
-    
-    -- Remove custom hitboxes
+    -- Remove all custom hitboxes
     for player, _ in pairs(customHitboxParts) do
         removeCustomHitbox(player)
     end
     customHitboxParts = {}
+    originalHitboxSizes = {}
 end
 
 -- Main loop
