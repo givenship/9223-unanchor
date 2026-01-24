@@ -1,6 +1,8 @@
 -- Roblox Executor GUI Script with Modular Tabs
 -- Main GUI that loads tab modules from GitHub
 
+print("bruh")
+
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local HttpService = game:GetService("HttpService")
