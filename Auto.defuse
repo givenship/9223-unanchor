@@ -3,6 +3,7 @@
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Get settings from global
@@ -17,6 +18,8 @@ local DEFUSE_ANIMATION_IDS = {
     "99918936475651",
     "115241304811827"
 }
+
+local detectionCircles = {} -- Store circles for each character
 
 -- Check if animation ID matches defuse animations
 local function isDefuseAnimation(numericId)
@@ -40,6 +43,67 @@ local function getDistance(character)
     if not targetHRP then return math.huge end
     
     return (LocalPlayer.Character.HumanoidRootPart.Position - targetHRP.Position).Magnitude
+end
+
+-- Create detection circle for character
+local function createDetectionCircle(character)
+    if detectionCircles[character] then
+        detectionCircles[character]:Destroy()
+    end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Create circle part
+    local circle = Instance.new("Part")
+    circle.Name = "DetectionCircle"
+    circle.Shape = Enum.PartType.Cylinder
+    circle.Size = Vector3.new(0.5, 60, 60) -- 30 stud radius = 60 diameter
+    circle.Anchored = true
+    circle.CanCollide = false
+    circle.Material = Enum.Material.Neon
+    circle.Transparency = 0.7
+    circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90)) -- Rotate to lay flat
+    circle.Parent = Workspace
+    
+    detectionCircles[character] = circle
+    
+    return circle
+end
+
+-- Remove detection circle
+local function removeDetectionCircle(character)
+    if detectionCircles[character] then
+        detectionCircles[character]:Destroy()
+        detectionCircles[character] = nil
+    end
+end
+
+-- Update circle colors based on distance
+local function updateCircleColors()
+    for character, circle in pairs(detectionCircles) do
+        if character and character.Parent and circle and circle.Parent then
+            local distance = getDistance(character)
+            
+            if distance <= 30 then
+                -- Green - in range
+                circle.Color = Color3.fromRGB(0, 255, 0)
+            else
+                -- Red - out of range
+                circle.Color = Color3.fromRGB(255, 0, 0)
+            end
+            
+            -- Update position to follow character
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))
+            end
+        else
+            -- Character removed, clean up
+            if circle then circle:Destroy() end
+            detectionCircles[character] = nil
+        end
+    end
 end
 
 -- Hook a character's animator
@@ -68,6 +132,9 @@ local function hookCharacter(character)
         
         -- Check if it's a defuse animation
         if isDefuseAnimation(numericId) then
+            -- Create circle for this character
+            createDetectionCircle(character)
+            
             -- Check distance
             local distance = getDistance(character)
             
@@ -80,8 +147,16 @@ local function hookCharacter(character)
                 -- Wait for delay
                 task.wait(AutoDefuseSettings.Delay or 3)
                 print("Defused")
+                
+                -- Remove circle after 2 seconds
+                task.wait(2)
+                removeDetectionCircle(character)
             else
                 print("Too far away:", math.floor(distance), "studs (need ≤30)")
+                
+                -- Remove circle after 2 seconds
+                task.wait(2)
+                removeDetectionCircle(character)
             end
         end
     end)
@@ -90,6 +165,8 @@ local function hookCharacter(character)
 end
 
 -- Start monitoring
+local circleUpdateConnection = nil
+
 local function startMonitoring()
     local characters = Workspace:FindFirstChild("Characters")
     
@@ -119,9 +196,30 @@ local function startMonitoring()
         end
     end)
     
+    -- Update circle colors every frame
+    circleUpdateConnection = RunService.Heartbeat:Connect(function()
+        if AutoDefuseSettings.Enabled then
+            updateCircleColors()
+        end
+    end)
+    
     print("Auto Defuse enabled - Event-based detection")
     print("Target IDs:", table.concat(DEFUSE_ANIMATION_IDS, ", "))
     print("Distance: ≤30 studs")
+    print("Visual circles will appear when defuse animations are detected")
+end
+
+local function stopMonitoring()
+    if circleUpdateConnection then
+        circleUpdateConnection:Disconnect()
+        circleUpdateConnection = nil
+    end
+    
+    -- Remove all circles
+    for character, circle in pairs(detectionCircles) do
+        circle:Destroy()
+    end
+    detectionCircles = {}
 end
 
 -- Export control functions
@@ -132,6 +230,7 @@ getgenv().AutoDefuseControl = {
     end,
     Stop = function()
         AutoDefuseSettings.Enabled = false
+        stopMonitoring()
         print("Auto Defuse disabled")
     end
 }
