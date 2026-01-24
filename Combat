@@ -541,3 +541,5 @@ function CombatModule.Cleanup()
 end
 
 return CombatModule
+
+print("sybau")
