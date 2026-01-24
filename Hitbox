@@ -28,24 +28,31 @@ local function isOnSameTeam(player)
 end
 
 local function calculateHitboxSize()
-    local sizeX = HitboxSettings.HitboxX
-    local sizeY = HitboxSettings.HitboxY
-    local sizeZ = HitboxSettings.HitboxZ
+    -- Get values based on selected mode
+    local sizeX = 2 -- Base size
+    local sizeY = 2
+    local sizeZ = 1
     
-    -- For position offset mode, always use full size
-    if HitboxSettings.UsePositionOffset then
-        return Vector3.new(sizeX, sizeY, sizeZ)
+    -- Apply directional expansion based on mode
+    if HitboxSettings.HitboxXMode == "left" then
+        sizeX = sizeX + HitboxSettings.HitboxLeft
+    else -- right
+        sizeX = sizeX + HitboxSettings.HitboxRight
     end
     
-    -- For normal mode, apply directional expansion
-    -- The original HRP is 2x2x1, we expand from that base
-    local baseSize = Vector3.new(2, 2, 1)
+    if HitboxSettings.HitboxYMode == "up" then
+        sizeY = sizeY + HitboxSettings.HitboxUp
+    else -- down
+        sizeY = sizeY + HitboxSettings.HitboxDown
+    end
     
-    return Vector3.new(
-        baseSize.X + sizeX,
-        baseSize.Y + sizeY,
-        baseSize.Z + sizeZ
-    )
+    if HitboxSettings.HitboxZMode == "front" then
+        sizeZ = sizeZ + HitboxSettings.HitboxFront
+    else -- back
+        sizeZ = sizeZ + HitboxSettings.HitboxBack
+    end
+    
+    return Vector3.new(sizeX, sizeY, sizeZ)
 end
 
 local function createPreviewBox()
