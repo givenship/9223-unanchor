@@ -1,8 +1,12 @@
 -- Auto Defuse Script
 -- Upload this to GitHub and use the raw link
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+print("man")
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
 -- Get settings from global
 local AutoDefuseSettings = getgenv().AutoDefuseSettings
@@ -11,83 +15,154 @@ if not AutoDefuseSettings then
     return
 end
 
-local soundConnections = {}
+local monitoredCharacters = {}
+local highlightCheckConnection = nil
+local typeCheckConnection = nil
 
--- Listen for DefuseChance sound
-local function connectToSound(soundObj)
-    if soundObj:IsA("Sound") and soundObj.Name == "DefuseChance" then
-        if soundConnections[soundObj] then return end
-        
-        print("Found DefuseChance sound - Setting up auto click")
-        
-        soundConnections[soundObj] = soundObj.Played:Connect(function()
-            if AutoDefuseSettings.Enabled then
-                print("DefuseChance sound played - Auto clicking NOW")
-                -- Simulate left mouse button click
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                task.wait(0.05)
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                print("Defused!")
+-- Type decal IDs to check
+local ExcludedTypes = {
+    Gravedigger = "rbxassetid://90297495789346",
+    Gladiator = "rbxassetid://7097554699",
+    Hunter = "rbxassetid://14244367874"
+}
+
+-- Check if character has excluded type
+local function isExcludedType(character)
+    for typeName, decalId in pairs(ExcludedTypes) do
+        local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+        if torso then
+            for _, obj in pairs(torso:GetChildren()) do
+                if obj:IsA("Decal") and obj.Texture == decalId then
+                    return true, typeName
+                end
             end
-        end)
+        end
     end
+    return false, nil
 end
 
--- Scan for existing sounds
-local function scanForSounds(parent)
-    for _, obj in pairs(parent:GetDescendants()) do
-        pcall(function()
-            connectToSound(obj)
-        end)
-    end
+-- Check if character is in Monster team
+local function isMonsterTeam(player)
+    if not player or not player.Team then return false end
+    return player.Team.Name == "Monster"
 end
 
--- Setup monitoring
-local function setupAutoDefuse()
-    local success, err = pcall(function()
-        -- Check if path exists
-        if not ReplicatedStorage:FindFirstChild("Assets") then
-            warn("ReplicatedStorage.Assets not found")
-            return
-        end
-        
-        local assets = ReplicatedStorage.Assets
-        if not assets:FindFirstChild("Sounds") then
-            warn("ReplicatedStorage.Assets.Sounds not found")
-            return
-        end
-        
-        local sounds = assets.Sounds
-        
-        -- Scan existing sounds
-        scanForSounds(sounds)
-        
-        -- Monitor for new sounds
-        sounds.DescendantAdded:Connect(function(child)
-            pcall(function()
-                connectToSound(child)
-            end)
-        end)
-        
-        print("Auto Defuse monitoring active")
-    end)
+-- Get distance from local player
+local function getDistance(character)
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return math.huge
+    end
     
-    if not success then
-        warn("Auto Defuse setup failed: " .. tostring(err))
+    local targetHRP = character:FindFirstChild("HumanoidRootPart")
+    if not targetHRP then return math.huge end
+    
+    return (LocalPlayer.Character.HumanoidRootPart.Position - targetHRP.Position).Magnitude
+end
+
+-- Check if character should be monitored
+local function shouldMonitor(character)
+    if not character or not character.Parent then return false end
+    
+    -- Get player from character
+    local player = Players:GetPlayerFromCharacter(character)
+    if not player then return false end
+    
+    -- Check if Monster team
+    if not isMonsterTeam(player) then return false end
+    
+    -- Check distance (15 studs)
+    if getDistance(character) > 15 then return false end
+    
+    -- Check if excluded type
+    local excluded, typeName = isExcludedType(character)
+    if excluded then
+        return false
+    end
+    
+    return true
+end
+
+-- Check for Highlight in character
+local function checkForHighlight(character)
+    if not AutoDefuseSettings.Enabled then return end
+    if not shouldMonitor(character) then return end
+    
+    -- Look for Highlight
+    local highlight = character:FindFirstChildOfClass("Highlight")
+    if highlight then
+        print("Defused!")
+        monitoredCharacters[character] = nil
     end
 end
 
--- Start monitoring
-setupAutoDefuse()
+-- Update monitored characters
+local function updateMonitoredCharacters()
+    monitoredCharacters = {}
+    
+    for _, character in pairs(Workspace:GetChildren()) do
+        if character:IsA("Model") and character:FindFirstChild("Humanoid") then
+            if shouldMonitor(character) then
+                monitoredCharacters[character] = true
+            end
+        end
+    end
+end
+
+-- Type check loop (every 2 seconds)
+local function startTypeCheck()
+    if typeCheckConnection then return end
+    
+    typeCheckConnection = task.spawn(function()
+        while AutoDefuseSettings.Enabled do
+            updateMonitoredCharacters()
+            task.wait(2)
+        end
+    end)
+end
+
+-- Highlight check loop (every 0.01 seconds)
+local function startHighlightCheck()
+    if highlightCheckConnection then return end
+    
+    highlightCheckConnection = RunService.Heartbeat:Connect(function()
+        if not AutoDefuseSettings.Enabled then return end
+        
+        for character, _ in pairs(monitoredCharacters) do
+            if character and character.Parent then
+                checkForHighlight(character)
+            else
+                monitoredCharacters[character] = nil
+            end
+        end
+    end)
+end
+
+local function stopMonitoring()
+    if highlightCheckConnection then
+        highlightCheckConnection:Disconnect()
+        highlightCheckConnection = nil
+    end
+    
+    if typeCheckConnection then
+        task.cancel(typeCheckConnection)
+        typeCheckConnection = nil
+    end
+    
+    monitoredCharacters = {}
+end
 
 -- Export control functions
 getgenv().AutoDefuseControl = {
     Start = function()
         AutoDefuseSettings.Enabled = true
-        print("Auto Defuse enabled")
+        updateMonitoredCharacters()
+        startTypeCheck()
+        startHighlightCheck()
+        print("Auto Defuse enabled - Monitoring characters")
     end,
     Stop = function()
         AutoDefuseSettings.Enabled = false
+        stopMonitoring()
         print("Auto Defuse disabled")
     end
 }
