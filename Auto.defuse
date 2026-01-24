@@ -2,7 +2,6 @@
 -- Upload this to GitHub and use the raw link
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
@@ -13,9 +12,6 @@ if not AutoDefuseSettings then
     return
 end
 
-local checkConnection = nil
-local detectedAnimations = {} -- Track which animations we've already detected
-
 -- Target animation IDs
 local DEFUSE_ANIMATION_IDS = {
     "99918936475651",
@@ -23,11 +19,7 @@ local DEFUSE_ANIMATION_IDS = {
 }
 
 -- Check if animation ID matches defuse animations
-local function isDefuseAnimation(animationId)
-    if not animationId then return false end
-    
-    -- Extract just the numbers from the animation ID
-    local numericId = animationId:match("%d+")
+local function isDefuseAnimation(numericId)
     if not numericId then return false end
     
     for _, targetId in pairs(DEFUSE_ANIMATION_IDS) do
@@ -50,92 +42,86 @@ local function getDistance(character)
     return (LocalPlayer.Character.HumanoidRootPart.Position - targetHRP.Position).Magnitude
 end
 
--- Check all characters for playing animations
-local function checkPlayingAnimations()
+-- Hook a character's animator
+local function hookCharacter(character)
     if not AutoDefuseSettings.Enabled then return end
     
-    for _, character in pairs(Workspace:GetChildren()) do
-        if character:IsA("Model") and character:FindFirstChild("Humanoid") then
-            -- Skip local player
-            local player = Players:GetPlayerFromCharacter(character)
-            if player == LocalPlayer then continue end
-            
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator", humanoid)
+    end
+
+    animator.AnimationPlayed:Connect(function(track)
+        if not AutoDefuseSettings.Enabled then return end
+        
+        local anim = track.Animation
+        if not anim then return end
+
+        local id = anim.AnimationId
+        local numericId = id:match("%d+")
+        if not numericId then return end
+
+        print("Animation detected:", numericId, "from", character.Name)
+        
+        -- Check if it's a defuse animation
+        if isDefuseAnimation(numericId) then
             -- Check distance
             local distance = getDistance(character)
-            if distance > 30 then continue end
             
-            -- Get humanoid and animator
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if not humanoid then continue end
-            
-            local animator = humanoid:FindFirstChildOfClass("Animator")
-            if not animator then continue end
-            
-            -- Check all playing animation tracks
-            local success, tracks = pcall(function()
-                return animator:GetPlayingAnimationTracks()
-            end)
-            
-            if not success or not tracks then continue end
-            
-            for _, track in pairs(tracks) do
-                if track.IsPlaying and track.Animation then
-                    local animId = track.Animation.AnimationId
-                    
-                    -- Check if it's a defuse animation
-                    if isDefuseAnimation(animId) then
-                        -- Create unique key for this detection
-                        local detectionKey = character.Name .. "_" .. animId .. "_" .. tostring(track.TimePosition)
-                        
-                        -- Only trigger once per animation play
-                        if not detectedAnimations[detectionKey] then
-                            detectedAnimations[detectionKey] = true
-                            
-                            print("DEFUSE ANIMATION DETECTED!")
-                            print("Character: " .. character.Name)
-                            print("Animation ID: " .. animId)
-                            print("Distance: " .. math.floor(distance) .. " studs")
-                            print("Waiting " .. (AutoDefuseSettings.Delay or 3) .. " seconds...")
-                            
-                            -- Wait for delay
-                            task.spawn(function()
-                                task.wait(AutoDefuseSettings.Delay or 3)
-                                print("Defused")
-                                
-                                -- Clean up detection key after a while
-                                task.wait(2)
-                                detectedAnimations[detectionKey] = nil
-                            end)
-                        end
-                    end
-                end
+            if distance <= 30 then
+                print("DEFUSE ANIMATION DETECTED!")
+                print("Character:", character.Name)
+                print("Distance:", math.floor(distance), "studs")
+                print("Waiting", AutoDefuseSettings.Delay or 3, "seconds...")
+                
+                -- Wait for delay
+                task.wait(AutoDefuseSettings.Delay or 3)
+                print("Defused")
+            else
+                print("Too far away:", math.floor(distance), "studs (need ≤30)")
             end
         end
-    end
+    end)
+    
+    print("Hooked character:", character.Name)
 end
 
 -- Start monitoring
 local function startMonitoring()
-    if checkConnection then return end
+    local characters = Workspace:FindFirstChild("Characters")
     
-    print("Auto Defuse enabled - Polling for animations")
-    print("Target IDs: 99918936475651, 115241304811827")
-    print("Distance: 30 studs")
-    
-    -- Check every 0.01 seconds (Heartbeat)
-    checkConnection = RunService.Heartbeat:Connect(function()
-        pcall(checkPlayingAnimations)
-    end)
-end
-
-local function stopMonitoring()
-    if checkConnection then
-        checkConnection:Disconnect()
-        checkConnection = nil
+    if not characters then
+        warn("Workspace.Characters not found! Looking in Workspace root instead...")
+        characters = Workspace
     end
     
-    detectedAnimations = {}
-    print("Auto Defuse disabled")
+    -- Hook existing characters
+    for _, character in ipairs(characters:GetChildren()) do
+        if character:IsA("Model") then
+            task.spawn(function()
+                hookCharacter(character)
+            end)
+        end
+    end
+    
+    -- Hook new characters
+    characters.ChildAdded:Connect(function(character)
+        if not AutoDefuseSettings.Enabled then return end
+        
+        task.wait(0.1) -- Let character fully load
+        if character:IsA("Model") then
+            task.spawn(function()
+                hookCharacter(character)
+            end)
+        end
+    end)
+    
+    print("Auto Defuse enabled - Event-based detection")
+    print("Target IDs:", table.concat(DEFUSE_ANIMATION_IDS, ", "))
+    print("Distance: ≤30 studs")
 end
 
 -- Export control functions
@@ -146,7 +132,7 @@ getgenv().AutoDefuseControl = {
     end,
     Stop = function()
         AutoDefuseSettings.Enabled = false
-        stopMonitoring()
+        print("Auto Defuse disabled")
     end
 }
 
