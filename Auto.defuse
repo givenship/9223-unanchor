@@ -46,75 +46,121 @@ local function getDistance(character)
     return (LocalPlayer.Character.HumanoidRootPart.Position - targetHRP.Position).Magnitude
 end
 
--- Create detection circle for character
+-- Create outline circle using multiple parts
 local function createDetectionCircle(character)
-    if not AutoDefuseSettings.ShowCircle then return end
-    
     if detectionCircles[character] then
-        detectionCircles[character]:Destroy()
+        for _, part in pairs(detectionCircles[character]) do
+            part:Destroy()
+        end
     end
     
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
     local radius = AutoDefuseSettings.DetectionRadius or 30
+    local segments = 32 -- Number of segments for smooth circle
+    local parts = {}
     
-    -- Create circle part
-    local circle = Instance.new("Part")
-    circle.Name = "DetectionCircle"
-    circle.Shape = Enum.PartType.Cylinder
-    circle.Size = Vector3.new(0.2, radius * 2, radius * 2) -- Thin cylinder
-    circle.Anchored = true
-    circle.CanCollide = false
-    circle.Material = Enum.Material.SmoothPlastic
-    circle.Transparency = 0 -- Fully visible
-    circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90)) -- Rotate to lay flat
-    circle.Parent = Workspace
+    for i = 1, segments do
+        local angle1 = (i - 1) / segments * math.pi * 2
+        local angle2 = i / segments * math.pi * 2
+        
+        local x1 = math.cos(angle1) * radius
+        local z1 = math.sin(angle1) * radius
+        local x2 = math.cos(angle2) * radius
+        local z2 = math.sin(angle2) * radius
+        
+        -- Calculate segment position and size
+        local midX = (x1 + x2) / 2
+        local midZ = (z1 + z2) / 2
+        local length = math.sqrt((x2 - x1)^2 + (z2 - z1)^2)
+        
+        -- Create segment part
+        local segment = Instance.new("Part")
+        segment.Name = "CircleSegment"
+        segment.Size = Vector3.new(0.3, 0.3, length) -- Thin outline
+        segment.Anchored = true
+        segment.CanCollide = false
+        segment.Material = Enum.Material.SmoothPlastic
+        segment.Transparency = 0
+        
+        -- Position and rotate segment
+        local segmentCFrame = hrp.CFrame * CFrame.new(midX, 0, midZ)
+        local lookAt = CFrame.lookAt(Vector3.new(x1, 0, z1), Vector3.new(x2, 0, z2))
+        segment.CFrame = segmentCFrame * CFrame.Angles(0, math.atan2(z2 - z1, x2 - x1), 0)
+        
+        segment.Parent = Workspace
+        table.insert(parts, segment)
+    end
     
-    detectionCircles[character] = circle
+    detectionCircles[character] = parts
     
-    return circle
+    return parts
 end
 
 -- Remove detection circle
 local function removeDetectionCircle(character)
     if detectionCircles[character] then
-        detectionCircles[character]:Destroy()
+        for _, part in pairs(detectionCircles[character]) do
+            part:Destroy()
+        end
         detectionCircles[character] = nil
     end
 end
 
--- Update circle colors and size based on distance
+-- Update circle colors and visibility based on distance
 local function updateCircleColors()
-    for character, circle in pairs(detectionCircles) do
-        if character and character.Parent and circle and circle.Parent then
+    for character, parts in pairs(detectionCircles) do
+        if character and character.Parent and parts then
             local distance = getDistance(character)
             local radius = AutoDefuseSettings.DetectionRadius or 30
             
-            -- Update size based on radius setting
-            circle.Size = Vector3.new(0.2, radius * 2, radius * 2)
-            
+            -- Determine color
+            local color
             if distance <= radius then
-                -- Green - in range
-                circle.Color = Color3.fromRGB(0, 255, 0)
+                color = Color3.fromRGB(0, 255, 0) -- Green - in range
             else
-                -- Red - out of range
-                circle.Color = Color3.fromRGB(255, 0, 0)
+                color = Color3.fromRGB(255, 0, 0) -- Red - out of range
             end
             
-            -- Update position to follow character
+            -- Update all segments
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if hrp then
-                circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))
-            end
-            
-            -- Hide circle if ShowCircle is disabled
-            if not AutoDefuseSettings.ShowCircle then
-                removeDetectionCircle(character)
+                local segments = #parts
+                
+                for i, part in pairs(parts) do
+                    if part and part.Parent then
+                        part.Color = color
+                        
+                        -- Update position based on new radius
+                        local angle1 = (i - 1) / segments * math.pi * 2
+                        local angle2 = i / segments * math.pi * 2
+                        
+                        local x1 = math.cos(angle1) * radius
+                        local z1 = math.sin(angle1) * radius
+                        local x2 = math.cos(angle2) * radius
+                        local z2 = math.sin(angle2) * radius
+                        
+                        local midX = (x1 + x2) / 2
+                        local midZ = (z1 + z2) / 2
+                        local length = math.sqrt((x2 - x1)^2 + (z2 - z1)^2)
+                        
+                        part.Size = Vector3.new(0.3, 0.3, length)
+                        local segmentCFrame = hrp.CFrame * CFrame.new(midX, 0, midZ)
+                        part.CFrame = segmentCFrame * CFrame.Angles(0, math.atan2(z2 - z1, x2 - x1), 0)
+                        
+                        -- Toggle visibility based on ShowCircle setting
+                        part.Transparency = AutoDefuseSettings.ShowCircle and 0 or 1
+                    end
+                end
             end
         else
             -- Character removed, clean up
-            if circle then circle:Destroy() end
+            if parts then
+                for _, part in pairs(parts) do
+                    if part then part:Destroy() end
+                end
+            end
             detectionCircles[character] = nil
         end
     end
@@ -146,7 +192,7 @@ local function hookCharacter(character)
         
         -- Check if it's a defuse animation
         if isDefuseAnimation(numericId) then
-            -- Create circle for this character
+            -- Create circle for this character (always shown, even if ShowCircle is false)
             createDetectionCircle(character)
             
             -- Check distance
@@ -154,13 +200,15 @@ local function hookCharacter(character)
             local distance = getDistance(character)
             
             if distance <= radius then
+                local delayMs = AutoDefuseSettings.Delay or 3000
+                
                 print("DEFUSE ANIMATION DETECTED!")
                 print("Character:", character.Name)
                 print("Distance:", math.floor(distance), "studs")
-                print("Waiting", AutoDefuseSettings.Delay or 3, "seconds...")
+                print("Waiting", delayMs, "milliseconds...")
                 
-                -- Wait for delay
-                task.wait(AutoDefuseSettings.Delay or 3)
+                -- Wait for delay (convert ms to seconds)
+                task.wait(delayMs / 1000)
                 
                 -- Send left click
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
@@ -227,6 +275,7 @@ local function startMonitoring()
     print("Auto Defuse enabled - Event-based detection")
     print("Target IDs:", table.concat(DEFUSE_ANIMATION_IDS, ", "))
     print("Detection Radius:", AutoDefuseSettings.DetectionRadius or 30, "studs")
+    print("Delay:", AutoDefuseSettings.Delay or 3000, "ms")
     print("Show Circle:", AutoDefuseSettings.ShowCircle and "Yes" or "No")
 end
 
@@ -237,8 +286,10 @@ local function stopMonitoring()
     end
     
     -- Remove all circles
-    for character, circle in pairs(detectionCircles) do
-        circle:Destroy()
+    for character, parts in pairs(detectionCircles) do
+        for _, part in pairs(parts) do
+            part:Destroy()
+        end
     end
     detectionCircles = {}
 end
