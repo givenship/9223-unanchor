@@ -16,15 +16,12 @@ local AIMLOCK_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/r
 getgenv().HitboxSettings = {
     Enabled = false,
     UsePositionOffset = false, -- Alternative mode (not recommended)
-    HitboxLeft = 2,
-    HitboxRight = 2,
-    HitboxUp = 2,
-    HitboxDown = 2,
-    HitboxFront = 2,
-    HitboxBack = 2,
-    HitboxXMode = "left", -- "left" or "right"
-    HitboxYMode = "up", -- "up" or "down"
-    HitboxZMode = "front", -- "front" or "back"
+    HitboxLeft = 0,
+    HitboxRight = 0,
+    HitboxUp = 0,
+    HitboxDown = 0,
+    HitboxFront = 0,
+    HitboxBack = 0,
     HitboxPosX = 0,
     HitboxPosY = 0,
     HitboxPosZ = 0,
@@ -359,7 +356,7 @@ function CombatModule.CreateUI(parent)
     -- Hitbox directional controls with separate sliders
     local function createDirectionalControl(name, directions, position)
         local container = Instance.new("Frame")
-        container.Size = UDim2.new(1, -20, 0, 120)
+        container.Size = UDim2.new(1, -20, 0, 100)
         container.Position = UDim2.new(0, 10, 0, position)
         container.BackgroundTransparency = 1
         container.Parent = combatContent
@@ -375,38 +372,32 @@ function CombatModule.CreateUI(parent)
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = container
         
-        -- Create buttons for each direction
-        local buttonWidth = 60
-        local buttonGap = 10
-        local sliders = {}
-        
         for i, dir in ipairs(directions) do
-            -- Button
-            local button = Instance.new("TextButton")
-            button.Size = UDim2.new(0, buttonWidth, 0, 30)
-            button.Position = UDim2.new(0, (i - 1) * (buttonWidth + buttonGap), 0, 25)
-            button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-            button.BorderSizePixel = 1
-            button.BorderColor3 = Color3.fromRGB(255, 255, 255)
-            button.Text = dir.label
-            button.Font = Enum.Font.GothamBlack
-            button.TextSize = 18
-            button.TextColor3 = Color3.fromRGB(255, 255, 255)
-            button.AutoButtonColor = false
-            button.Parent = container
-            
-            -- Slider for this direction
+            -- Direction label and slider
             local sliderContainer = Instance.new("Frame")
-            sliderContainer.Size = UDim2.new(1, -140, 0, 30)
-            sliderContainer.Position = UDim2.new(0, 135, 0, 25 + (i - 1) * 35)
+            sliderContainer.Size = UDim2.new(1, -40, 0, 30)
+            sliderContainer.Position = UDim2.new(0, 35, 0, 20 + (i - 1) * 35)
             sliderContainer.BackgroundTransparency = 1
             sliderContainer.Parent = container
             
+            -- Direction button (now just a label)
+            local dirButton = Instance.new("TextLabel")
+            dirButton.Size = UDim2.new(0, 25, 0, 20)
+            dirButton.Position = UDim2.new(0, -35, 0, 5)
+            dirButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            dirButton.BorderSizePixel = 1
+            dirButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+            dirButton.Text = dir.label
+            dirButton.Font = Enum.Font.GothamBlack
+            dirButton.TextSize = 14
+            dirButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            dirButton.Parent = sliderContainer
+            
             local valueLabel = Instance.new("TextLabel")
             valueLabel.Size = UDim2.new(0, 30, 0, 20)
-            valueLabel.Position = UDim2.new(0, -35, 0, 5)
+            valueLabel.Position = UDim2.new(0, 0, 0, 5)
             valueLabel.BackgroundTransparency = 1
-            valueLabel.Text = tostring(getgenv().HitboxSettings[dir.key] or 2)
+            valueLabel.Text = tostring(getgenv().HitboxSettings[dir.key] or 0)
             valueLabel.Font = Enum.Font.GothamBold
             valueLabel.TextSize = 12
             valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -414,15 +405,15 @@ function CombatModule.CreateUI(parent)
             valueLabel.Parent = sliderContainer
             
             local sliderBg = Instance.new("Frame")
-            sliderBg.Size = UDim2.new(1, 0, 0, 20)
-            sliderBg.Position = UDim2.new(0, 0, 0, 5)
+            sliderBg.Size = UDim2.new(1, -35, 0, 20)
+            sliderBg.Position = UDim2.new(0, 35, 0, 5)
             sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
             sliderBg.BorderSizePixel = 1
             sliderBg.BorderColor3 = Color3.fromRGB(255, 255, 255)
             sliderBg.Parent = sliderContainer
             
             local sliderFill = Instance.new("Frame")
-            sliderFill.Size = UDim2.new((getgenv().HitboxSettings[dir.key] or 2) / 20, 0, 1, 0)
+            sliderFill.Size = UDim2.new((getgenv().HitboxSettings[dir.key] or 0) / 20, 0, 1, 0)
             sliderFill.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
             sliderFill.BorderSizePixel = 0
             sliderFill.Parent = sliderBg
@@ -432,16 +423,6 @@ function CombatModule.CreateUI(parent)
             sliderButton.BackgroundTransparency = 1
             sliderButton.Text = ""
             sliderButton.Parent = sliderBg
-            
-            -- Initially disable slider
-            sliderContainer.Visible = false
-            
-            sliders[dir.key] = {
-                container = sliderContainer,
-                fill = sliderFill,
-                label = valueLabel,
-                button = button
-            }
             
             -- Slider dragging
             local dragging = false
@@ -461,66 +442,31 @@ function CombatModule.CreateUI(parent)
                     local mouse = UserInputService:GetMouseLocation()
                     local relativeX = math.clamp(mouse.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
                     local percentage = relativeX / sliderBg.AbsoluteSize.X
-                    local value = math.floor(1 + (20 - 1) * percentage)
+                    local value = math.floor(0 + (20 - 0) * percentage)
                     
                     getgenv().HitboxSettings[dir.key] = value
                     sliderFill.Size = UDim2.new(value / 20, 0, 1, 0)
                     valueLabel.Text = tostring(value)
                 end
             end)
-            
-            -- Button click to toggle slider
-            button.MouseButton1Click:Connect(function()
-                -- Hide all sliders in this group
-                for key, slider in pairs(sliders) do
-                    slider.container.Visible = false
-                    slider.button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                end
-                
-                -- Show this slider
-                sliderContainer.Visible = true
-                button.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
-                
-                -- Set mode
-                getgenv().HitboxSettings[name:gsub(" ", "") .. "Mode"] = dir.mode
-            end)
-            
-            button.MouseEnter:Connect(function()
-                if button.BackgroundColor3 ~= Color3.fromRGB(30, 144, 255) then
-                    button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-                end
-            end)
-            
-            button.MouseLeave:Connect(function()
-                if button.BackgroundColor3 ~= Color3.fromRGB(30, 144, 255) then
-                    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                end
-            end)
         end
         
-        -- Activate first button by default
-        if sliders[directions[1].key] then
-            sliders[directions[1].key].container.Visible = true
-            sliders[directions[1].key].button.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
-            getgenv().HitboxSettings[name:gsub(" ", "") .. "Mode"] = directions[1].mode
-        end
-        
-        return position + 130
+        return position + 110
     end
     
     yPos = createDirectionalControl("Hitbox X", {
-        {label = "L", mode = "left", key = "HitboxLeft"},
-        {label = "R", mode = "right", key = "HitboxRight"}
+        {label = "L", key = "HitboxLeft"},
+        {label = "R", key = "HitboxRight"}
     }, yPos)
     
     yPos = createDirectionalControl("Hitbox Y", {
-        {label = "U", mode = "up", key = "HitboxUp"},
-        {label = "D", mode = "down", key = "HitboxDown"}
+        {label = "U", key = "HitboxUp"},
+        {label = "D", key = "HitboxDown"}
     }, yPos)
     
     yPos = createDirectionalControl("Hitbox Z", {
-        {label = "F", mode = "front", key = "HitboxFront"},
-        {label = "B", mode = "back", key = "HitboxBack"}
+        {label = "F", key = "HitboxFront"},
+        {label = "B", key = "HitboxBack"}
     }, yPos)
     yPos = createTransparencySlider("Transparency", getgenv().HitboxSettings, "HitboxTransparency", yPos)
     yPos = createTransparencySlider("Preview Transp.", getgenv().HitboxSettings, "PreviewTransparency", yPos)
