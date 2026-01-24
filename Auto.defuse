@@ -1,6 +1,8 @@
 -- Auto Defuse Script
 -- Upload this to GitHub and use the raw link
 
+print("hello")
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
