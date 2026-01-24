@@ -16,9 +16,12 @@ local AIMLOCK_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/r
 getgenv().HitboxSettings = {
     Enabled = false,
     UsePositionOffset = false, -- Alternative mode (not recommended)
-    HitboxX = 2,
-    HitboxY = 2,
-    HitboxZ = 2,
+    HitboxLeft = 2,
+    HitboxRight = 2,
+    HitboxUp = 2,
+    HitboxDown = 2,
+    HitboxFront = 2,
+    HitboxBack = 2,
     HitboxPosX = 0,
     HitboxPosY = 0,
     HitboxPosZ = 0,
@@ -324,9 +327,111 @@ function CombatModule.CreateUI(parent)
         end
     end)
     
-    yPos = createSlider("Hitbox X (L/R)", getgenv().HitboxSettings, "HitboxX", 1, 20, yPos)
-    yPos = createSlider("Hitbox Y (U/D)", getgenv().HitboxSettings, "HitboxY", 1, 20, yPos)
-    yPos = createSlider("Hitbox Z (F/B)", getgenv().HitboxSettings, "HitboxZ", 1, 20, yPos)
+    -- Hitbox directional controls with buttons
+    local function createDirectionalControl(name, leftKey, rightKey, minVal, maxVal, position)
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(1, -20, 0, 70)
+        container.Position = UDim2.new(0, 10, 0, position)
+        container.BackgroundTransparency = 1
+        container.Parent = combatContent
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0, 120, 0, 20)
+        label.Position = UDim2.new(0, 0, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = name .. ": " .. getgenv().HitboxSettings[leftKey] + getgenv().HitboxSettings[rightKey]
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 14
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = container
+        
+        -- Left/Down/Back button
+        local leftButton = Instance.new("TextButton")
+        leftButton.Size = UDim2.new(0, 60, 0, 40)
+        leftButton.Position = UDim2.new(0, 0, 0, 25)
+        leftButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        leftButton.BorderSizePixel = 1
+        leftButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+        leftButton.Text = name:match("%((.-)%)"):sub(1, 1) -- Get first letter (L/U/F)
+        leftButton.Font = Enum.Font.GothamBlack
+        leftButton.TextSize = 18
+        leftButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        leftButton.AutoButtonColor = false
+        leftButton.Parent = container
+        
+        -- Right/Up/Front button
+        local rightButton = Instance.new("TextButton")
+        rightButton.Size = UDim2.new(0, 60, 0, 40)
+        rightButton.Position = UDim2.new(0, 70, 0, 25)
+        rightButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        rightButton.BorderSizePixel = 1
+        rightButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+        rightButton.Text = name:match("%((.-)%)"):sub(3, 3) -- Get third letter (R/D/B)
+        rightButton.Font = Enum.Font.GothamBlack
+        rightButton.TextSize = 18
+        rightButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        rightButton.AutoButtonColor = false
+        rightButton.Parent = container
+        
+        -- Slider for visual feedback
+        local sliderBg = Instance.new("Frame")
+        sliderBg.Size = UDim2.new(1, -140, 0, 40)
+        sliderBg.Position = UDim2.new(0, 135, 0, 25)
+        sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        sliderBg.BorderSizePixel = 1
+        sliderBg.BorderColor3 = Color3.fromRGB(255, 255, 255)
+        sliderBg.Parent = container
+        
+        local sliderFill = Instance.new("Frame")
+        local totalValue = getgenv().HitboxSettings[leftKey] + getgenv().HitboxSettings[rightKey]
+        sliderFill.Size = UDim2.new((totalValue - minVal) / (maxVal - minVal), 0, 1, 0)
+        sliderFill.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+        sliderFill.BorderSizePixel = 0
+        sliderFill.Parent = sliderBg
+        
+        local function updateDisplay()
+            local totalValue = getgenv().HitboxSettings[leftKey] + getgenv().HitboxSettings[rightKey]
+            label.Text = name .. ": " .. totalValue
+            sliderFill.Size = UDim2.new((totalValue - minVal) / (maxVal - minVal), 0, 1, 0)
+        end
+        
+        leftButton.MouseButton1Click:Connect(function()
+            if getgenv().HitboxSettings[leftKey] > 0 then
+                getgenv().HitboxSettings[leftKey] = getgenv().HitboxSettings[leftKey] - 1
+                updateDisplay()
+            end
+        end)
+        
+        rightButton.MouseButton1Click:Connect(function()
+            if getgenv().HitboxSettings[rightKey] < maxVal then
+                getgenv().HitboxSettings[rightKey] = getgenv().HitboxSettings[rightKey] + 1
+                updateDisplay()
+            end
+        end)
+        
+        leftButton.MouseEnter:Connect(function()
+            leftButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        end)
+        
+        leftButton.MouseLeave:Connect(function()
+            leftButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end)
+        
+        rightButton.MouseEnter:Connect(function()
+            rightButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        end)
+        
+        rightButton.MouseLeave:Connect(function()
+            rightButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end)
+        
+        return position + 80
+    end
+    
+    yPos = createDirectionalControl("Hitbox X (L/R)", "HitboxLeft", "HitboxRight", 0, 20, yPos)
+    yPos = createDirectionalControl("Hitbox Y (U/D)", "HitboxDown", "HitboxUp", 0, 20, yPos)
+    yPos = createDirectionalControl("Hitbox Z (F/B)", "HitboxBack", "HitboxFront", 0, 20, yPos)
     yPos = createTransparencySlider("Transparency", getgenv().HitboxSettings, "HitboxTransparency", yPos)
     yPos = createTransparencySlider("Preview Transp.", getgenv().HitboxSettings, "PreviewTransparency", yPos)
     
