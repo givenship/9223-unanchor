@@ -11,7 +11,7 @@ local CombatModule = {}
 -- GitHub URLs
 local HITBOX_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Hitbox"
 local AIMLOCK_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Aimlock"
-local AUTODEFUSE_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/AutoDefuse"
+local AUTODEFUSE_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Auto.defuse"
 
 -- Settings for Hitbox
 getgenv().HitboxSettings = {
