@@ -73,19 +73,24 @@ local function lockJumppower()
         jumppowerConnection = RunService.Heartbeat:Connect(function()
             if LocalPlayer.Character then
                 local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.JumpPower then
-                    humanoid.JumpPower = getgenv().PlayerSettings.JumppowerValue
-                end
-                -- Also set JumpHeight for R15
-                if humanoid and humanoid.UseJumpPower == false then
-                    -- Convert jumppower to jumpheight (approximate)
-                    humanoid.JumpHeight = getgenv().PlayerSettings.JumppowerValue / 5
+                if humanoid then
+                    -- Disable UseJumpPower to force JumpHeight mode
+                    humanoid.UseJumpPower = false
+                    -- Set JumpHeight
+                    humanoid.JumpHeight = getgenv().PlayerSettings.JumppowerValue
                 end
             end
         end)
-        print("Jumppower locked to", getgenv().PlayerSettings.JumppowerValue)
+        print("JumpHeight locked to", getgenv().PlayerSettings.JumppowerValue)
     else
-        print("Jumppower lock disabled")
+        -- Re-enable UseJumpPower when disabled
+        if LocalPlayer.Character then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.UseJumpPower = true
+            end
+        end
+        print("JumpHeight lock disabled")
     end
 end
 
@@ -130,7 +135,7 @@ local function toggleNoclip()
     end
 end
 
--- Invisible (Carpet method with Y offset)
+-- Invisible (Carpet method with locked Y position)
 local function toggleInvisible()
     -- Clean up existing invisible
     if carpetLoop then
@@ -172,6 +177,13 @@ local function toggleInvisible()
         carpet = humanoid:LoadAnimation(carpetAnim)
         carpet:Play(.1, 1, 1)
         
+        -- Get initial Y position with offset
+        local root = getRoot(LocalPlayer.Character)
+        if not root then return end
+        
+        local yOffset = getgenv().PlayerSettings.InvisibleYOffset or -2
+        local lockedY = root.Position.Y + yOffset
+        
         -- Handle death
         carpetDied = humanoid.Died:Connect(function()
             if carpetLoop then carpetLoop:Disconnect() end
@@ -180,40 +192,20 @@ local function toggleInvisible()
             if carpetDied then carpetDied:Disconnect() end
         end)
         
-        -- Maintain position with Y offset and noclip ground
+        -- Lock Y position
         carpetLoop = RunService.Heartbeat:Connect(function()
             pcall(function()
                 local root = getRoot(LocalPlayer.Character)
                 if root then
-                    -- Apply Y offset
-                    local yOffset = getgenv().PlayerSettings.InvisibleYOffset or -2
-                    local targetY = root.Position.Y + yOffset
-                    root.CFrame = CFrame.new(root.Position.X, targetY, root.Position.Z)
-                    
-                    -- Noclip ground (Workspace.Map)
-                    local map = Workspace:FindFirstChild("Map")
-                    if map then
-                        for _, part in pairs(map:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                part.CanCollide = false
-                            end
-                        end
-                    end
+                    -- Lock Y position, allow X and Z movement
+                    local currentPos = root.Position
+                    root.CFrame = CFrame.new(currentPos.X, lockedY, currentPos.Z)
                 end
             end)
         end)
         
-        print("Invisible enabled with Y offset:", getgenv().PlayerSettings.InvisibleYOffset)
+        print("Invisible enabled - Y position locked at:", lockedY)
     else
-        -- Re-enable ground collision
-        local map = Workspace:FindFirstChild("Map")
-        if map then
-            for _, part in pairs(map:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
-        end
         print("Invisible disabled")
     end
 end
@@ -345,7 +337,7 @@ function PlayerModule.CreateUI(parent)
     jumpTitle.Size = UDim2.new(1, -20, 0, 30)
     jumpTitle.Position = UDim2.new(0, 10, 0, yPos)
     jumpTitle.BackgroundTransparency = 1
-    jumpTitle.Text = "JUMPPOWER"
+    jumpTitle.Text = "JUMP HEIGHT"
     jumpTitle.Font = Enum.Font.GothamBlack
     jumpTitle.TextSize = 16
     jumpTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -353,8 +345,8 @@ function PlayerModule.CreateUI(parent)
     jumpTitle.Parent = playerContent
     yPos = yPos + 40
     
-    yPos = createToggleButton("Lock Jumppower", getgenv().PlayerSettings, "LockJumppower", yPos, lockJumppower)
-    yPos = createSlider("Jumppower Value", getgenv().PlayerSettings, "JumppowerValue", 1, 200, yPos)
+    yPos = createToggleButton("Lock JumpHeight", getgenv().PlayerSettings, "LockJumppower", yPos, lockJumppower)
+    yPos = createSlider("JumpHeight Value", getgenv().PlayerSettings, "JumppowerValue", 1, 200, yPos)
     
     yPos = yPos + 10
     
