@@ -1,0 +1,380 @@
+-- Misc Module
+-- F3X-style part controller
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local MiscModule = {}
+
+-- Settings
+getgenv().MiscSettings = {
+    PartControllerEnabled = false,
+    ControlDistance = 10, -- Distance from camera
+    MoveSpeed = 0.5,
+    RotateSpeed = 5
+}
+
+-- Part controller variables
+local selectedPart = nil
+local controlConnection = nil
+local selectionBox = nil
+local isRotating = false
+
+-- Create selection box
+local function createSelectionBox(part)
+    if selectionBox then
+        selectionBox:Destroy()
+    end
+    
+    selectionBox = Instance.new("SelectionBox")
+    selectionBox.Color3 = Color3.fromRGB(0, 170, 255)
+    selectionBox.LineThickness = 0.05
+    selectionBox.Transparency = 0.3
+    selectionBox.Adornee = part
+    selectionBox.Parent = part
+    
+    return selectionBox
+end
+
+-- Get mouse target (unanchored parts only)
+local function getMouseTarget()
+    local mouse = LocalPlayer:GetMouse()
+    local target = mouse.Target
+    
+    if target and target:IsA("BasePart") and not target.Anchored then
+        -- Exclude character parts
+        if not target:IsDescendantOf(LocalPlayer.Character) then
+            return target
+        end
+    end
+    
+    return nil
+end
+
+-- Control part position and rotation
+local function controlPart()
+    if not selectedPart or not selectedPart.Parent then
+        selectedPart = nil
+        if selectionBox then
+            selectionBox:Destroy()
+            selectionBox = nil
+        end
+        return
+    end
+    
+    local camera = Workspace.CurrentCamera
+    local distance = getgenv().MiscSettings.ControlDistance or 10
+    
+    -- Calculate position in front of camera
+    local targetPosition = camera.CFrame.Position + (camera.CFrame.LookVector * distance)
+    
+    -- Movement input
+    local moveDirection = Vector3.new(0, 0, 0)
+    
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+        moveDirection = moveDirection + camera.CFrame.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+        moveDirection = moveDirection - camera.CFrame.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+        moveDirection = moveDirection - camera.CFrame.RightVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+        moveDirection = moveDirection + camera.CFrame.RightVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.E) then
+        moveDirection = moveDirection + Vector3.new(0, 1, 0)
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Q) then
+        moveDirection = moveDirection - Vector3.new(0, 1, 0)
+    end
+    
+    -- Apply movement
+    if moveDirection.Magnitude > 0 then
+        local moveSpeed = getgenv().MiscSettings.MoveSpeed or 0.5
+        targetPosition = targetPosition + (moveDirection.Unit * moveSpeed)
+    end
+    
+    -- Rotation input (R to toggle rotation mode)
+    if isRotating then
+        local rotateSpeed = getgenv().MiscSettings.RotateSpeed or 5
+        local rotation = selectedPart.CFrame - selectedPart.CFrame.Position
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+            rotation = rotation * CFrame.Angles(math.rad(rotateSpeed), 0, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+            rotation = rotation * CFrame.Angles(math.rad(-rotateSpeed), 0, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+            rotation = rotation * CFrame.Angles(0, math.rad(rotateSpeed), 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Right) then
+            rotation = rotation * CFrame.Angles(0, math.rad(-rotateSpeed), 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.PageUp) then
+            rotation = rotation * CFrame.Angles(0, 0, math.rad(rotateSpeed))
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.PageDown) then
+            rotation = rotation * CFrame.Angles(0, 0, math.rad(-rotateSpeed))
+        end
+        
+        selectedPart.CFrame = CFrame.new(targetPosition) * rotation
+    else
+        -- Just move, keep original rotation
+        selectedPart.CFrame = CFrame.new(targetPosition) * (selectedPart.CFrame - selectedPart.CFrame.Position)
+    end
+    
+    -- Reset velocity to prevent physics interference
+    selectedPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+    selectedPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+end
+
+-- Start part controller
+local function startPartController()
+    if controlConnection then return end
+    
+    print("Part Controller enabled")
+    print("Left Click - Select part")
+    print("WASD/Q/E - Move part")
+    print("R - Toggle rotation mode")
+    print("Arrow Keys - Rotate (when R is active)")
+    print("Delete - Release part")
+    
+    -- Click to select part
+    local mouse = LocalPlayer:GetMouse()
+    mouse.Button1Down:Connect(function()
+        if not getgenv().MiscSettings.PartControllerEnabled then return end
+        
+        local target = getMouseTarget()
+        if target then
+            selectedPart = target
+            createSelectionBox(selectedPart)
+            print("Selected:", selectedPart.Name)
+        end
+    end)
+    
+    -- R to toggle rotation mode
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not getgenv().MiscSettings.PartControllerEnabled then return end
+        
+        if input.KeyCode == Enum.KeyCode.R and selectedPart then
+            isRotating = not isRotating
+            if selectionBox then
+                selectionBox.Color3 = isRotating and Color3.fromRGB(255, 170, 0) or Color3.fromRGB(0, 170, 255)
+            end
+            print(isRotating and "Rotation mode ON" or "Rotation mode OFF")
+        elseif input.KeyCode == Enum.KeyCode.Delete and selectedPart then
+            print("Released:", selectedPart.Name)
+            selectedPart = nil
+            isRotating = false
+            if selectionBox then
+                selectionBox:Destroy()
+                selectionBox = nil
+            end
+        end
+    end)
+    
+    -- Control loop
+    controlConnection = RunService.RenderStepped:Connect(function()
+        if getgenv().MiscSettings.PartControllerEnabled and selectedPart then
+            pcall(controlPart)
+        end
+    end)
+end
+
+local function stopPartController()
+    if controlConnection then
+        controlConnection:Disconnect()
+        controlConnection = nil
+    end
+    
+    if selectionBox then
+        selectionBox:Destroy()
+        selectionBox = nil
+    end
+    
+    selectedPart = nil
+    isRotating = false
+    print("Part Controller disabled")
+end
+
+function MiscModule.CreateUI(parent)
+    local miscContent = Instance.new("ScrollingFrame")
+    miscContent.Size = UDim2.new(1, 0, 1, 0)
+    miscContent.BackgroundTransparency = 1
+    miscContent.BorderSizePixel = 0
+    miscContent.ScrollBarThickness = 4
+    miscContent.Parent = parent
+    
+    local yPos = 10
+    
+    -- Helper function to create toggle button
+    local function createToggleButton(name, settingsTable, settingKey, position, callback)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(1, -20, 0, 35)
+        button.Position = UDim2.new(0, 10, 0, position)
+        button.BackgroundColor3 = settingsTable[settingKey] and Color3.fromRGB(30, 144, 255) or Color3.fromRGB(60, 60, 60)
+        button.BorderSizePixel = 0
+        button.Text = name .. ": " .. (settingsTable[settingKey] and "ENABLED" or "DISABLED")
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.Parent = miscContent
+        
+        button.MouseButton1Click:Connect(function()
+            settingsTable[settingKey] = not settingsTable[settingKey]
+            button.BackgroundColor3 = settingsTable[settingKey] and Color3.fromRGB(30, 144, 255) or Color3.fromRGB(60, 60, 60)
+            button.Text = name .. ": " .. (settingsTable[settingKey] and "ENABLED" or "DISABLED")
+            if callback then callback(settingsTable[settingKey]) end
+        end)
+        
+        return position + 45
+    end
+    
+    -- Helper function to create slider
+    local function createSlider(name, settingsTable, settingKey, minVal, maxVal, position)
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(1, -20, 0, 50)
+        container.Position = UDim2.new(0, 10, 0, position)
+        container.BackgroundTransparency = 1
+        container.Parent = miscContent
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0, 120, 0, 20)
+        label.Position = UDim2.new(0, 0, 0, 5)
+        label.BackgroundTransparency = 1
+        label.Text = name .. ": " .. settingsTable[settingKey]
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 12
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = container
+        
+        local sliderBg = Instance.new("Frame")
+        sliderBg.Size = UDim2.new(1, -130, 0, 20)
+        sliderBg.Position = UDim2.new(0, 125, 0, 25)
+        sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        sliderBg.BorderSizePixel = 1
+        sliderBg.BorderColor3 = Color3.fromRGB(255, 255, 255)
+        sliderBg.Parent = container
+        
+        local sliderFill = Instance.new("Frame")
+        sliderFill.Size = UDim2.new((settingsTable[settingKey] - minVal) / (maxVal - minVal), 0, 1, 0)
+        sliderFill.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+        sliderFill.BorderSizePixel = 0
+        sliderFill.Parent = sliderBg
+        
+        local sliderButton = Instance.new("TextButton")
+        sliderButton.Size = UDim2.new(1, 0, 1, 0)
+        sliderButton.BackgroundTransparency = 1
+        sliderButton.Text = ""
+        sliderButton.Parent = sliderBg
+        
+        local dragging = false
+        
+        sliderButton.MouseButton1Down:Connect(function()
+            dragging = true
+        end)
+        
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+        
+        RunService.RenderStepped:Connect(function()
+            if dragging then
+                local mouse = UserInputService:GetMouseLocation()
+                local relativeX = math.clamp(mouse.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+                local percentage = relativeX / sliderBg.AbsoluteSize.X
+                local value = minVal + (maxVal - minVal) * percentage
+                
+                -- Round based on range
+                if maxVal - minVal <= 10 then
+                    value = math.floor(value * 10) / 10 -- 1 decimal
+                else
+                    value = math.floor(value)
+                end
+                
+                settingsTable[settingKey] = value
+                sliderFill.Size = UDim2.new((value - minVal) / (maxVal - minVal), 0, 1, 0)
+                label.Text = name .. ": " .. value
+            end
+        end)
+        
+        return position + 60
+    end
+    
+    -- PART CONTROLLER Section
+    local controllerTitle = Instance.new("TextLabel")
+    controllerTitle.Size = UDim2.new(1, -20, 0, 30)
+    controllerTitle.Position = UDim2.new(0, 10, 0, yPos)
+    controllerTitle.BackgroundTransparency = 1
+    controllerTitle.Text = "PART CONTROLLER"
+    controllerTitle.Font = Enum.Font.GothamBlack
+    controllerTitle.TextSize = 16
+    controllerTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    controllerTitle.TextXAlignment = Enum.TextXAlignment.Left
+    controllerTitle.Parent = miscContent
+    yPos = yPos + 40
+    
+    yPos = createToggleButton("Part Controller", getgenv().MiscSettings, "PartControllerEnabled", yPos, function(enabled)
+        if enabled then
+            startPartController()
+        else
+            stopPartController()
+        end
+    end)
+    
+    yPos = createSlider("Control Distance", getgenv().MiscSettings, "ControlDistance", 1, 50, yPos)
+    yPos = createSlider("Move Speed", getgenv().MiscSettings, "MoveSpeed", 0.1, 5, yPos)
+    yPos = createSlider("Rotate Speed", getgenv().MiscSettings, "RotateSpeed", 1, 20, yPos)
+    
+    -- Controls info
+    local controlsTitle = Instance.new("TextLabel")
+    controlsTitle.Size = UDim2.new(1, -20, 0, 25)
+    controlsTitle.Position = UDim2.new(0, 10, 0, yPos)
+    controlsTitle.BackgroundTransparency = 1
+    controlsTitle.Text = "CONTROLS:"
+    controlsTitle.Font = Enum.Font.GothamBold
+    controlsTitle.TextSize = 12
+    controlsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    controlsTitle.TextXAlignment = Enum.TextXAlignment.Left
+    controlsTitle.Parent = miscContent
+    yPos = yPos + 30
+    
+    local controlsInfo = Instance.new("TextLabel")
+    controlsInfo.Size = UDim2.new(1, -20, 0, 140)
+    controlsInfo.Position = UDim2.new(0, 10, 0, yPos)
+    controlsInfo.BackgroundTransparency = 1
+    controlsInfo.Text = [[Left Click - Select unanchored part
+WASD - Move horizontally
+Q - Move down
+E - Move up
+R - Toggle rotation mode
+Arrow Keys - Rotate (when R active)
+PageUp/PageDown - Roll (when R active)
+Delete - Release part]]
+    controlsInfo.Font = Enum.Font.Gotham
+    controlsInfo.TextSize = 11
+    controlsInfo.TextColor3 = Color3.fromRGB(200, 200, 200)
+    controlsInfo.TextXAlignment = Enum.TextXAlignment.Left
+    controlsInfo.TextYAlignment = Enum.TextYAlignment.Top
+    controlsInfo.TextWrapped = true
+    controlsInfo.Parent = miscContent
+    yPos = yPos + 150
+    
+    miscContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 20)
+end
+
+function MiscModule.Cleanup()
+    stopPartController()
+end
+
+return MiscModule
