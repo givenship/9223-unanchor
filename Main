@@ -10,7 +10,7 @@ local ModuleURLs = {
     Visual = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Visual",
     Combat = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Combat",
     Player = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Player",
-    Misc = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/misc-module.lua",
+    Misc = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Misc",
     Settings = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Settings"
 }
 
