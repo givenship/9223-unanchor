@@ -82,7 +82,7 @@ local function updateNearbyCharacters()
     nearbyCharacters = newNearby
 end
 
--- Create simple circle using mesh
+-- Create simple circle using single part
 local function createDetectionCircle(character)
     if detectionCircles[character] then return end
     
@@ -91,23 +91,17 @@ local function createDetectionCircle(character)
     
     local radius = AutoDefuseSettings.DetectionRadius or 30
     
-    -- Create circle part with mesh
+    -- Create single circle part
     local circle = Instance.new("Part")
     circle.Name = "DetectionCircle"
-    circle.Size = Vector3.new(radius * 2, 0.2, radius * 2)
+    circle.Shape = Enum.PartType.Cylinder
+    circle.Size = Vector3.new(0.2, radius * 2, radius * 2)
     circle.Anchored = true
     circle.CanCollide = false
     circle.Material = Enum.Material.SmoothPlastic
-    circle.Transparency = 1 -- Make part invisible
-    circle.CFrame = hrp.CFrame * CFrame.Angles(math.rad(90), 0, 0) -- Rotate to lay flat
+    circle.Transparency = 0
+    circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))
     circle.Parent = Workspace
-    
-    -- Add mesh
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.FileMesh
-    mesh.MeshId = "rbxassetid://125071719379373"
-    mesh.Scale = Vector3.new(radius * 2, radius * 2, radius * 2)
-    mesh.Parent = circle
     
     detectionCircles[character] = circle
 end
@@ -166,14 +160,10 @@ local function updateCircles()
                 circle.Color = color
                 
                 -- Update position
-                circle.CFrame = hrp.CFrame * CFrame.Angles(math.rad(90), 0, 0)
+                circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))
                 
                 -- Update size if radius changed
-                circle.Size = Vector3.new(radius * 2, 0.2, radius * 2)
-                local mesh = circle:FindFirstChildOfClass("SpecialMesh")
-                if mesh then
-                    mesh.Scale = Vector3.new(radius * 2, radius * 2, radius * 2)
-                end
+                circle.Size = Vector3.new(0.2, radius * 2, radius * 2)
             end
         else
             if circle then circle:Destroy() end
@@ -316,7 +306,7 @@ local function startMonitoring()
         end
     end)
     
-    print("Auto Defuse enabled - Simple mesh circles")
+    print("Auto Defuse enabled - Simple cylinder circles")
     print("Target IDs:", table.concat(DEFUSE_ANIMATION_IDS, ", "))
     print("Detection Radius:", AutoDefuseSettings.DetectionRadius or 30, "studs")
     print("Max Range: 70 studs (checked every 3s)")
