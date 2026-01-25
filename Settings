@@ -1,0 +1,156 @@
+-- Settings Module
+-- Contains script reload and other settings
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local SettingsModule = {}
+
+function SettingsModule.CreateUI(parent)
+    local settingsContent = Instance.new("ScrollingFrame")
+    settingsContent.Size = UDim2.new(1, 0, 1, 0)
+    settingsContent.BackgroundTransparency = 1
+    settingsContent.BorderSizePixel = 0
+    settingsContent.ScrollBarThickness = 4
+    settingsContent.Parent = parent
+    
+    local yPos = 10
+    
+    -- SCRIPT RELOAD Section
+    local reloadTitle = Instance.new("TextLabel")
+    reloadTitle.Size = UDim2.new(1, -20, 0, 30)
+    reloadTitle.Position = UDim2.new(0, 10, 0, yPos)
+    reloadTitle.BackgroundTransparency = 1
+    reloadTitle.Text = "SCRIPT MANAGEMENT"
+    reloadTitle.Font = Enum.Font.GothamBlack
+    reloadTitle.TextSize = 16
+    reloadTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    reloadTitle.TextXAlignment = Enum.TextXAlignment.Left
+    reloadTitle.Parent = settingsContent
+    yPos = yPos + 40
+    
+    -- Reload button
+    local reloadButton = Instance.new("TextButton")
+    reloadButton.Size = UDim2.new(1, -20, 0, 50)
+    reloadButton.Position = UDim2.new(0, 10, 0, yPos)
+    reloadButton.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+    reloadButton.BorderSizePixel = 0
+    reloadButton.Text = "🔄 RELOAD SCRIPT"
+    reloadButton.Font = Enum.Font.GothamBold
+    reloadButton.TextSize = 16
+    reloadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    reloadButton.Parent = settingsContent
+    
+    local reloadCorner = Instance.new("UICorner")
+    reloadCorner.CornerRadius = UDim.new(0, 6)
+    reloadCorner.Parent = reloadButton
+    
+    local reloadStroke = Instance.new("UIStroke")
+    reloadStroke.Color = Color3.fromRGB(255, 255, 255)
+    reloadStroke.Thickness = 1
+    reloadStroke.Parent = reloadButton
+    
+    reloadButton.MouseButton1Click:Connect(function()
+        -- Show confirmation
+        reloadButton.Text = "Reloading..."
+        reloadButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+        
+        task.wait(0.5)
+        
+        -- Destroy the GUI
+        local coreGui = game:GetService("CoreGui")
+        for _, gui in pairs(coreGui:GetChildren()) do
+            if gui.Name:match("^ExecutorGui_") then
+                gui:Destroy()
+            end
+        end
+        
+        -- Re-execute the script
+        -- Note: User needs to re-run their executor script
+        print("Script GUI destroyed - Please re-execute your script")
+    end)
+    
+    reloadButton.MouseEnter:Connect(function()
+        reloadButton.BackgroundColor3 = Color3.fromRGB(50, 164, 255)
+    end)
+    
+    reloadButton.MouseLeave:Connect(function()
+        reloadButton.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+    end)
+    
+    yPos = yPos + 60
+    
+    local reloadNote = Instance.new("TextLabel")
+    reloadNote.Size = UDim2.new(1, -20, 0, 40)
+    reloadNote.Position = UDim2.new(0, 10, 0, yPos)
+    reloadNote.BackgroundTransparency = 1
+    reloadNote.Text = "Note: This will close the GUI. Re-execute your script to reload."
+    reloadNote.Font = Enum.Font.Gotham
+    reloadNote.TextSize = 11
+    reloadNote.TextColor3 = Color3.fromRGB(200, 200, 200)
+    reloadNote.TextXAlignment = Enum.TextXAlignment.Left
+    reloadNote.TextWrapped = true
+    reloadNote.Parent = settingsContent
+    yPos = yPos + 50
+    
+    -- KEYBINDS Section
+    local keybindsTitle = Instance.new("TextLabel")
+    keybindsTitle.Size = UDim2.new(1, -20, 0, 30)
+    keybindsTitle.Position = UDim2.new(0, 10, 0, yPos)
+    keybindsTitle.BackgroundTransparency = 1
+    keybindsTitle.Text = "KEYBINDS"
+    keybindsTitle.Font = Enum.Font.GothamBlack
+    keybindsTitle.TextSize = 16
+    keybindsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    keybindsTitle.TextXAlignment = Enum.TextXAlignment.Left
+    keybindsTitle.Parent = settingsContent
+    yPos = yPos + 40
+    
+    local keybindInfo = Instance.new("TextLabel")
+    keybindInfo.Size = UDim2.new(1, -20, 0, 60)
+    keybindInfo.Position = UDim2.new(0, 10, 0, yPos)
+    keybindInfo.BackgroundTransparency = 1
+    keybindInfo.Text = "Right Alt - Toggle GUI Visibility\n\nPress Right Alt to hide/show the GUI"
+    keybindInfo.Font = Enum.Font.Gotham
+    keybindInfo.TextSize = 12
+    keybindInfo.TextColor3 = Color3.fromRGB(255, 255, 255)
+    keybindInfo.TextXAlignment = Enum.TextXAlignment.Left
+    keybindInfo.TextWrapped = true
+    keybindInfo.Parent = settingsContent
+    yPos = yPos + 70
+    
+    -- INFO Section
+    local infoTitle = Instance.new("TextLabel")
+    infoTitle.Size = UDim2.new(1, -20, 0, 30)
+    infoTitle.Position = UDim2.new(0, 10, 0, yPos)
+    infoTitle.BackgroundTransparency = 1
+    infoTitle.Text = "INFORMATION"
+    infoTitle.Font = Enum.Font.GothamBlack
+    infoTitle.TextSize = 16
+    infoTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    infoTitle.TextXAlignment = Enum.TextXAlignment.Left
+    infoTitle.Parent = settingsContent
+    yPos = yPos + 40
+    
+    local infoText = Instance.new("TextLabel")
+    infoText.Size = UDim2.new(1, -20, 0, 80)
+    infoText.Position = UDim2.new(0, 10, 0, yPos)
+    infoText.BackgroundTransparency = 1
+    infoText.Text = "Executor GUI v1.0\n\nFeatures:\n• Combat - Hitbox, Aimlock, Auto Defuse\n• Visual - ESP, Health Bars, Object ESP\n• Player - Reset, JumpHeight, Noclip, Invisible\n• Settings - Script Management"
+    infoText.Font = Enum.Font.Gotham
+    infoText.TextSize = 12
+    infoText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    infoText.TextXAlignment = Enum.TextXAlignment.Left
+    infoText.TextYAlignment = Enum.TextYAlignment.Top
+    infoText.TextWrapped = true
+    infoText.Parent = settingsContent
+    yPos = yPos + 90
+    
+    settingsContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 20)
+end
+
+function SettingsModule.Cleanup()
+    -- No cleanup needed for settings
+end
+
+return SettingsModule
