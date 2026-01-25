@@ -16,13 +16,8 @@ getgenv().MiscSettings = {
 
 -- Part controller variables
 local selectedPart = nil
-local isDragging = false
-local dragAxis = nil -- "X", "Y", "Z", or nil for free drag
-local dragStartMousePos = nil
-local dragStartPartPos = nil
 local selectionBox = nil
 local dragHandles = nil
-local dragConnection = nil
 
 -- Create selection box and drag handles
 local function createSelectionVisuals(part)
@@ -68,89 +63,6 @@ local function getMouseTarget()
     return nil
 end
 
--- Get mouse ray
-local function getMouseRay()
-    local camera = Workspace.CurrentCamera
-    local mouse = LocalPlayer:GetMouse()
-    return camera:ScreenPointToRay(mouse.X, mouse.Y)
-end
-
--- Project point onto axis
-local function projectOntoAxis(point, origin, axis)
-    local offset = point - origin
-    local projection = offset:Dot(axis)
-    return origin + (axis * projection)
-end
-
--- Drag part smoothly
-local function dragPart()
-    if not selectedPart or not selectedPart.Parent or not isDragging then
-        return
-    end
-    
-    local ray = getMouseRay()
-    local camera = Workspace.CurrentCamera
-    
-    if dragAxis then
-        -- Dragging on a specific axis
-        local axis = Vector3.new(0, 0, 0)
-        if dragAxis == "X" then
-            axis = Vector3.new(1, 0, 0)
-        elseif dragAxis == "Y" then
-            axis = Vector3.new(0, 1, 0)
-        elseif dragAxis == "Z" then
-            axis = Vector3.new(0, 0, 1)
-        end
-        
-        -- Find closest point on axis to mouse ray
-        local partPos = selectedPart.Position
-        local axisLine = partPos + axis
-        
-        -- Calculate intersection
-        local cameraCFrame = camera.CFrame
-        local mouseDir = ray.Direction
-        
-        -- Project mouse ray onto the axis
-        local t = ((dragStartPartPos - cameraCFrame.Position):Dot(axis)) / (mouseDir:Dot(axis))
-        local mousePoint = cameraCFrame.Position + (mouseDir * t)
-        
-        -- Project onto axis
-        local targetPos = projectOntoAxis(mousePoint, dragStartPartPos, axis)
-        
-        -- Smooth movement
-        local currentPos = selectedPart.Position
-        local newPos = currentPos:Lerp(targetPos, 0.5)
-        
-        selectedPart.CFrame = CFrame.new(newPos) * (selectedPart.CFrame - selectedPart.CFrame.Position)
-    else
-        -- Free drag on plane perpendicular to camera
-        local planeNormal = camera.CFrame.LookVector
-        local planePosition = selectedPart.Position
-        
-        -- Ray-plane intersection
-        local denominator = ray.Direction:Dot(planeNormal)
-        
-        if math.abs(denominator) > 0.0001 then
-            local t = (planePosition - ray.Origin):Dot(planeNormal) / denominator
-            local mousePos3D = ray.Origin + ray.Direction * t
-            
-            -- Calculate offset
-            local offset = mousePos3D - dragStartMousePos
-            local targetPos = dragStartPartPos + offset
-            
-            -- Smooth movement
-            local currentPos = selectedPart.Position
-            local newPos = currentPos:Lerp(targetPos, 0.5)
-            
-            selectedPart.CFrame = CFrame.new(newPos) * (selectedPart.CFrame - selectedPart.CFrame.Position)
-        end
-    end
-    
-    -- Reset velocity for smooth control
-    selectedPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-    selectedPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-end
-
 -- Start part controller
 local function startPartController()
     if dragConnection then return end
@@ -167,45 +79,37 @@ local function startPartController()
         local target = getMouseTarget()
         if target then
             selectedPart = target
-            createSelectionVisuals(selectedPart)
+            local box, handles = createSelectionVisuals(selectedPart)
             print("Selected:", selectedPart.Name)
             
-            -- Connect handle events
-            if dragHandles then
-                dragHandles.MouseButton1Down:Connect(function(face)
-                    isDragging = true
+            -- Connect to Handles MouseDrag event
+            if handles then
+                handles.MouseDrag:Connect(function(face, distance)
+                    if not selectedPart or not selectedPart.Parent then return end
                     
-                    -- Determine axis from face
-                    if face == Enum.NormalId.Right or face == Enum.NormalId.Left then
-                        dragAxis = "X"
-                    elseif face == Enum.NormalId.Top or face == Enum.NormalId.Bottom then
-                        dragAxis = "Y"
-                    elseif face == Enum.NormalId.Front or face == Enum.NormalId.Back then
-                        dragAxis = "Z"
+                    -- Calculate movement based on face
+                    local moveVector = Vector3.new(0, 0, 0)
+                    
+                    if face == Enum.NormalId.Right then
+                        moveVector = Vector3.new(distance, 0, 0)
+                    elseif face == Enum.NormalId.Left then
+                        moveVector = Vector3.new(-distance, 0, 0)
+                    elseif face == Enum.NormalId.Top then
+                        moveVector = Vector3.new(0, distance, 0)
+                    elseif face == Enum.NormalId.Bottom then
+                        moveVector = Vector3.new(0, -distance, 0)
+                    elseif face == Enum.NormalId.Front then
+                        moveVector = Vector3.new(0, 0, distance)
+                    elseif face == Enum.NormalId.Back then
+                        moveVector = Vector3.new(0, 0, -distance)
                     end
                     
-                    dragStartPartPos = selectedPart.Position
+                    -- Move part
+                    selectedPart.Position = selectedPart.Position + moveVector
                     
-                    local ray = getMouseRay()
-                    local camera = Workspace.CurrentCamera
-                    local planeNormal = camera.CFrame.LookVector
-                    local planePosition = selectedPart.Position
-                    local denominator = ray.Direction:Dot(planeNormal)
-                    
-                    if math.abs(denominator) > 0.0001 then
-                        local t = (planePosition - ray.Origin):Dot(planeNormal) / denominator
-                        dragStartMousePos = ray.Origin + ray.Direction * t
-                    end
-                    
-                    print("Dragging on axis:", dragAxis)
-                end)
-                
-                dragHandles.MouseButton1Up:Connect(function()
-                    if isDragging then
-                        isDragging = false
-                        dragAxis = nil
-                        print("Drag released")
-                    end
+                    -- Reset velocity
+                    selectedPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    selectedPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                 end)
             end
         end
@@ -225,7 +129,7 @@ local function startPartController()
                 selectionBox.Color3 = selectedPart.Anchored and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 170, 255)
             end
             
-            -- Remove selection if now anchored
+            -- Remove/add handles based on anchor state
             if selectedPart.Anchored then
                 if dragHandles then
                     dragHandles:Destroy()
@@ -238,8 +142,6 @@ local function startPartController()
         elseif input.KeyCode == Enum.KeyCode.Escape and selectedPart then
             print("Deselected:", selectedPart.Name)
             selectedPart = nil
-            isDragging = false
-            dragAxis = nil
             if selectionBox then
                 selectionBox:Destroy()
                 selectionBox = nil
@@ -250,21 +152,9 @@ local function startPartController()
             end
         end
     end)
-    
-    -- Drag loop (smooth real-time movement)
-    dragConnection = RunService.RenderStepped:Connect(function()
-        if getgenv().MiscSettings.PartControllerEnabled and isDragging then
-            pcall(dragPart)
-        end
-    end)
 end
 
 local function stopPartController()
-    if dragConnection then
-        dragConnection:Disconnect()
-        dragConnection = nil
-    end
-    
     if selectionBox then
         selectionBox:Destroy()
         selectionBox = nil
@@ -276,8 +166,6 @@ local function stopPartController()
     end
     
     selectedPart = nil
-    isDragging = false
-    dragAxis = nil
     print("Part Controller disabled")
 end
 
