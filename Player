@@ -16,7 +16,8 @@ getgenv().PlayerSettings = {
     LockJumppower = false,
     JumppowerValue = 50,
     Noclip = false,
-    Invisible = false
+    Invisible = false,
+    InvisibleYOffset = -2 -- Y offset for invisible
 }
 
 -- Connections
@@ -103,9 +104,19 @@ local function toggleNoclip()
                         part.CanCollide = false
                     end
                 end
+                
+                -- Re-enable collision for Map parts
+                local map = workspace:FindFirstChild("Map")
+                if map then
+                    for _, part in pairs(map:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = true
+                        end
+                    end
+                end
             end
         end)
-        print("Noclip enabled")
+        print("Noclip enabled (excluding Map)")
     else
         -- Re-enable collision
         if LocalPlayer.Character then
@@ -144,47 +155,64 @@ local function toggleInvisible()
             print("Warning: Invisible works best with R6")
         end
         
-        -- Set Y offset
-        local rootPart = getRoot(LocalPlayer.Character)
-        if rootPart then
-            rootPart.CFrame = rootPart.CFrame * CFrame.new(0, -2, 0)
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+        
+        -- Stop all other animations
+        local animator = humanoid:FindFirstChildOfClass("Animator")
+        if animator then
+            for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                track:Stop()
+            end
         end
         
         -- Apply carpet animation
-        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            carpetAnim = Instance.new("Animation")
-            carpetAnim.AnimationId = "rbxassetid://282574440"
-            carpet = humanoid:LoadAnimation(carpetAnim)
-            carpet:Play(.1, 1, 1)
-            
-            -- Handle death
-            carpetDied = humanoid.Died:Connect(function()
-                if carpetLoop then carpetLoop:Disconnect() end
-                if carpet then carpet:Stop() end
-                if carpetAnim then carpetAnim:Destroy() end
-                if carpetDied then carpetDied:Disconnect() end
-            end)
-            
-            -- Maintain position
-            carpetLoop = RunService.Heartbeat:Connect(function()
-                pcall(function()
-                    local root = getRoot(LocalPlayer.Character)
-                    if root then
-                        -- Keep Y offset
-                        local currentPos = root.Position
-                        root.CFrame = CFrame.new(currentPos.X, currentPos.Y, currentPos.Z)
+        carpetAnim = Instance.new("Animation")
+        carpetAnim.AnimationId = "rbxassetid://282574440"
+        carpet = humanoid:LoadAnimation(carpetAnim)
+        carpet:Play(.1, 1, 1)
+        
+        -- Handle death
+        carpetDied = humanoid.Died:Connect(function()
+            if carpetLoop then carpetLoop:Disconnect() end
+            if carpet then carpet:Stop() end
+            if carpetAnim then carpetAnim:Destroy() end
+            if carpetDied then carpetDied:Disconnect() end
+        end)
+        
+        -- Maintain position with Y offset and noclip ground
+        carpetLoop = RunService.Heartbeat:Connect(function()
+            pcall(function()
+                local root = getRoot(LocalPlayer.Character)
+                if root then
+                    -- Apply Y offset
+                    local yOffset = getgenv().PlayerSettings.InvisibleYOffset or -2
+                    local targetY = root.Position.Y + yOffset
+                    root.CFrame = CFrame.new(root.Position.X, targetY, root.Position.Z)
+                    
+                    -- Noclip ground (Workspace.Map)
+                    local map = Workspace:FindFirstChild("Map")
+                    if map then
+                        for _, part in pairs(map:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
+                            end
+                        end
                     end
-                end)
+                end
             end)
-            
-            print("Invisible enabled")
-        end
+        end)
+        
+        print("Invisible enabled with Y offset:", getgenv().PlayerSettings.InvisibleYOffset)
     else
-        -- Reset position
-        local rootPart = getRoot(LocalPlayer.Character)
-        if rootPart then
-            rootPart.CFrame = rootPart.CFrame * CFrame.new(0, 2, 0)
+        -- Re-enable ground collision
+        local map = Workspace:FindFirstChild("Map")
+        if map then
+            for _, part in pairs(map:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
         end
         print("Invisible disabled")
     end
@@ -361,6 +389,7 @@ function PlayerModule.CreateUI(parent)
     yPos = yPos + 40
     
     yPos = createToggleButton("Invisible", getgenv().PlayerSettings, "Invisible", yPos, toggleInvisible)
+    yPos = createSlider("Y Offset", getgenv().PlayerSettings, "InvisibleYOffset", -10, 10, yPos)
     
     local invisNote = Instance.new("TextLabel")
     invisNote.Size = UDim2.new(1, -20, 0, 30)
