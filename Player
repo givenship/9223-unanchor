@@ -1,0 +1,401 @@
+-- Player Module
+-- Features: Reset Character, Lock Jumppower, Noclip, Invisible
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
+
+local PlayerModule = {}
+
+-- Settings
+getgenv().PlayerSettings = {
+    ResetEnabled = false,
+    LockJumppower = false,
+    JumppowerValue = 50,
+    Noclip = false,
+    Invisible = false
+}
+
+-- Connections
+local jumppowerConnection = nil
+local noclipConnection = nil
+local invisibleConnection = nil
+local carpetAnim = nil
+local carpet = nil
+local carpetLoop = nil
+local carpetDied = nil
+
+-- Check if character is R15
+local function isR15(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+    return humanoid.RigType == Enum.HumanoidRigType.R15
+end
+
+-- Get character root part
+local function getRoot(character)
+    return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso"))
+end
+
+-- Enable Reset Character
+local function enableReset()
+    if getgenv().PlayerSettings.ResetEnabled then
+        -- Method 1: Fire fall damage remote
+        local success = pcall(function()
+            local args = {"Damage", math.huge}
+            ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("FallDamage"):FireServer(unpack(args))
+        end)
+        
+        if success then
+            print("Reset character via fall damage")
+        else
+            -- Method 2: Enable CoreGui reset button
+            pcall(function()
+                StarterGui:SetCore("ResetButtonCallback", true)
+                print("Reset button enabled")
+            end)
+        end
+    end
+end
+
+-- Lock Jumppower
+local function lockJumppower()
+    if jumppowerConnection then
+        jumppowerConnection:Disconnect()
+        jumppowerConnection = nil
+    end
+    
+    if getgenv().PlayerSettings.LockJumppower then
+        jumppowerConnection = RunService.Heartbeat:Connect(function()
+            if LocalPlayer.Character then
+                local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.JumpPower then
+                    humanoid.JumpPower = getgenv().PlayerSettings.JumppowerValue
+                end
+                -- Also set JumpHeight for R15
+                if humanoid and humanoid.UseJumpPower == false then
+                    -- Convert jumppower to jumpheight (approximate)
+                    humanoid.JumpHeight = getgenv().PlayerSettings.JumppowerValue / 5
+                end
+            end
+        end)
+        print("Jumppower locked to", getgenv().PlayerSettings.JumppowerValue)
+    else
+        print("Jumppower lock disabled")
+    end
+end
+
+-- Noclip
+local function toggleNoclip()
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+    
+    if getgenv().PlayerSettings.Noclip then
+        noclipConnection = RunService.Stepped:Connect(function()
+            if LocalPlayer.Character then
+                for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+        print("Noclip enabled")
+    else
+        -- Re-enable collision
+        if LocalPlayer.Character then
+            for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+        print("Noclip disabled")
+    end
+end
+
+-- Invisible (Carpet method with Y offset)
+local function toggleInvisible()
+    -- Clean up existing invisible
+    if carpetLoop then
+        carpetLoop:Disconnect()
+        carpetLoop = nil
+    end
+    if carpet then
+        carpet:Stop()
+        carpet = nil
+    end
+    if carpetAnim then
+        carpetAnim:Destroy()
+        carpetAnim = nil
+    end
+    if carpetDied then
+        carpetDied:Disconnect()
+        carpetDied = nil
+    end
+    
+    if getgenv().PlayerSettings.Invisible then
+        if isR15(LocalPlayer.Character) then
+            print("Warning: Invisible works best with R6")
+        end
+        
+        -- Set Y offset
+        local rootPart = getRoot(LocalPlayer.Character)
+        if rootPart then
+            rootPart.CFrame = rootPart.CFrame * CFrame.new(0, -2, 0)
+        end
+        
+        -- Apply carpet animation
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            carpetAnim = Instance.new("Animation")
+            carpetAnim.AnimationId = "rbxassetid://282574440"
+            carpet = humanoid:LoadAnimation(carpetAnim)
+            carpet:Play(.1, 1, 1)
+            
+            -- Handle death
+            carpetDied = humanoid.Died:Connect(function()
+                if carpetLoop then carpetLoop:Disconnect() end
+                if carpet then carpet:Stop() end
+                if carpetAnim then carpetAnim:Destroy() end
+                if carpetDied then carpetDied:Disconnect() end
+            end)
+            
+            -- Maintain position
+            carpetLoop = RunService.Heartbeat:Connect(function()
+                pcall(function()
+                    local root = getRoot(LocalPlayer.Character)
+                    if root then
+                        -- Keep Y offset
+                        local currentPos = root.Position
+                        root.CFrame = CFrame.new(currentPos.X, currentPos.Y, currentPos.Z)
+                    end
+                end)
+            end)
+            
+            print("Invisible enabled")
+        end
+    else
+        -- Reset position
+        local rootPart = getRoot(LocalPlayer.Character)
+        if rootPart then
+            rootPart.CFrame = rootPart.CFrame * CFrame.new(0, 2, 0)
+        end
+        print("Invisible disabled")
+    end
+end
+
+function PlayerModule.CreateUI(parent)
+    local playerContent = Instance.new("ScrollingFrame")
+    playerContent.Size = UDim2.new(1, 0, 1, 0)
+    playerContent.BackgroundTransparency = 1
+    playerContent.BorderSizePixel = 0
+    playerContent.ScrollBarThickness = 4
+    playerContent.Parent = parent
+    
+    local yPos = 10
+    
+    -- Helper function to create toggle button
+    local function createToggleButton(name, settingsTable, settingKey, position, callback)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(1, -20, 0, 35)
+        button.Position = UDim2.new(0, 10, 0, position)
+        button.BackgroundColor3 = settingsTable[settingKey] and Color3.fromRGB(30, 144, 255) or Color3.fromRGB(60, 60, 60)
+        button.BorderSizePixel = 0
+        button.Text = name .. ": " .. (settingsTable[settingKey] and "ENABLED" or "DISABLED")
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.Parent = playerContent
+        
+        button.MouseButton1Click:Connect(function()
+            settingsTable[settingKey] = not settingsTable[settingKey]
+            button.BackgroundColor3 = settingsTable[settingKey] and Color3.fromRGB(30, 144, 255) or Color3.fromRGB(60, 60, 60)
+            button.Text = name .. ": " .. (settingsTable[settingKey] and "ENABLED" or "DISABLED")
+            if callback then callback(settingsTable[settingKey]) end
+        end)
+        
+        return position + 45
+    end
+    
+    -- Helper function to create slider
+    local function createSlider(name, settingsTable, settingKey, minVal, maxVal, position)
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(1, -20, 0, 50)
+        container.Position = UDim2.new(0, 10, 0, position)
+        container.BackgroundTransparency = 1
+        container.Parent = playerContent
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0, 100, 0, 20)
+        label.Position = UDim2.new(0, 0, 0, 5)
+        label.BackgroundTransparency = 1
+        label.Text = name .. ": " .. settingsTable[settingKey]
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 12
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = container
+        
+        local sliderBg = Instance.new("Frame")
+        sliderBg.Size = UDim2.new(1, -110, 0, 20)
+        sliderBg.Position = UDim2.new(0, 105, 0, 25)
+        sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        sliderBg.BorderSizePixel = 1
+        sliderBg.BorderColor3 = Color3.fromRGB(255, 255, 255)
+        sliderBg.Parent = container
+        
+        local sliderFill = Instance.new("Frame")
+        sliderFill.Size = UDim2.new((settingsTable[settingKey] - minVal) / (maxVal - minVal), 0, 1, 0)
+        sliderFill.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+        sliderFill.BorderSizePixel = 0
+        sliderFill.Parent = sliderBg
+        
+        local sliderButton = Instance.new("TextButton")
+        sliderButton.Size = UDim2.new(1, 0, 1, 0)
+        sliderButton.BackgroundTransparency = 1
+        sliderButton.Text = ""
+        sliderButton.Parent = sliderBg
+        
+        local dragging = false
+        
+        sliderButton.MouseButton1Down:Connect(function()
+            dragging = true
+        end)
+        
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+        
+        RunService.RenderStepped:Connect(function()
+            if dragging then
+                local mouse = UserInputService:GetMouseLocation()
+                local relativeX = math.clamp(mouse.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+                local percentage = relativeX / sliderBg.AbsoluteSize.X
+                local value = math.floor(minVal + (maxVal - minVal) * percentage)
+                
+                settingsTable[settingKey] = value
+                sliderFill.Size = UDim2.new((value - minVal) / (maxVal - minVal), 0, 1, 0)
+                label.Text = name .. ": " .. value
+                
+                -- Update jumppower if lock is enabled
+                if settingKey == "JumppowerValue" and getgenv().PlayerSettings.LockJumppower then
+                    lockJumppower()
+                end
+            end
+        end)
+        
+        return position + 60
+    end
+    
+    -- RESET CHARACTER Section
+    local resetTitle = Instance.new("TextLabel")
+    resetTitle.Size = UDim2.new(1, -20, 0, 30)
+    resetTitle.Position = UDim2.new(0, 10, 0, yPos)
+    resetTitle.BackgroundTransparency = 1
+    resetTitle.Text = "RESET CHARACTER"
+    resetTitle.Font = Enum.Font.GothamBlack
+    resetTitle.TextSize = 16
+    resetTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    resetTitle.TextXAlignment = Enum.TextXAlignment.Left
+    resetTitle.Parent = playerContent
+    yPos = yPos + 40
+    
+    yPos = createToggleButton("Enable Reset", getgenv().PlayerSettings, "ResetEnabled", yPos, enableReset)
+    
+    yPos = yPos + 10
+    
+    -- JUMPPOWER Section
+    local jumpTitle = Instance.new("TextLabel")
+    jumpTitle.Size = UDim2.new(1, -20, 0, 30)
+    jumpTitle.Position = UDim2.new(0, 10, 0, yPos)
+    jumpTitle.BackgroundTransparency = 1
+    jumpTitle.Text = "JUMPPOWER"
+    jumpTitle.Font = Enum.Font.GothamBlack
+    jumpTitle.TextSize = 16
+    jumpTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    jumpTitle.TextXAlignment = Enum.TextXAlignment.Left
+    jumpTitle.Parent = playerContent
+    yPos = yPos + 40
+    
+    yPos = createToggleButton("Lock Jumppower", getgenv().PlayerSettings, "LockJumppower", yPos, lockJumppower)
+    yPos = createSlider("Jumppower Value", getgenv().PlayerSettings, "JumppowerValue", 1, 200, yPos)
+    
+    yPos = yPos + 10
+    
+    -- NOCLIP Section
+    local noclipTitle = Instance.new("TextLabel")
+    noclipTitle.Size = UDim2.new(1, -20, 0, 30)
+    noclipTitle.Position = UDim2.new(0, 10, 0, yPos)
+    noclipTitle.BackgroundTransparency = 1
+    noclipTitle.Text = "NOCLIP"
+    noclipTitle.Font = Enum.Font.GothamBlack
+    noclipTitle.TextSize = 16
+    noclipTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    noclipTitle.TextXAlignment = Enum.TextXAlignment.Left
+    noclipTitle.Parent = playerContent
+    yPos = yPos + 40
+    
+    yPos = createToggleButton("Noclip", getgenv().PlayerSettings, "Noclip", yPos, toggleNoclip)
+    
+    yPos = yPos + 10
+    
+    -- INVISIBLE Section
+    local invisTitle = Instance.new("TextLabel")
+    invisTitle.Size = UDim2.new(1, -20, 0, 30)
+    invisTitle.Position = UDim2.new(0, 10, 0, yPos)
+    invisTitle.BackgroundTransparency = 1
+    invisTitle.Text = "INVISIBLE"
+    invisTitle.Font = Enum.Font.GothamBlack
+    invisTitle.TextSize = 16
+    invisTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    invisTitle.TextXAlignment = Enum.TextXAlignment.Left
+    invisTitle.Parent = playerContent
+    yPos = yPos + 40
+    
+    yPos = createToggleButton("Invisible", getgenv().PlayerSettings, "Invisible", yPos, toggleInvisible)
+    
+    local invisNote = Instance.new("TextLabel")
+    invisNote.Size = UDim2.new(1, -20, 0, 30)
+    invisNote.Position = UDim2.new(0, 10, 0, yPos)
+    invisNote.BackgroundTransparency = 1
+    invisNote.Text = "Note: Works best with R6"
+    invisNote.Font = Enum.Font.Gotham
+    invisNote.TextSize = 10
+    invisNote.TextColor3 = Color3.fromRGB(200, 200, 200)
+    invisNote.TextXAlignment = Enum.TextXAlignment.Left
+    invisNote.Parent = playerContent
+    yPos = yPos + 35
+    
+    playerContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 20)
+end
+
+function PlayerModule.Cleanup()
+    if jumppowerConnection then
+        jumppowerConnection:Disconnect()
+    end
+    if noclipConnection then
+        noclipConnection:Disconnect()
+    end
+    if carpetLoop then
+        carpetLoop:Disconnect()
+    end
+    if carpet then
+        carpet:Stop()
+    end
+    if carpetAnim then
+        carpetAnim:Destroy()
+    end
+    if carpetDied then
+        carpetDied:Disconnect()
+    end
+end
+
+return PlayerModule
