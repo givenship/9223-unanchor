@@ -1,6 +1,8 @@
 -- Auto Defuse Script
 -- Upload this to GitHub and use the raw link
 
+print("fuck efn")
+
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -46,7 +48,7 @@ local function getDistance(character)
     return (LocalPlayer.Character.HumanoidRootPart.Position - targetHRP.Position).Magnitude
 end
 
--- Create outline circle using multiple parts
+-- Create outline circle using multiple thin parts
 local function createDetectionCircle(character)
     if detectionCircles[character] then
         for _, part in pairs(detectionCircles[character]) do
@@ -58,44 +60,40 @@ local function createDetectionCircle(character)
     if not hrp then return end
     
     local radius = AutoDefuseSettings.DetectionRadius or 30
-    local segments = 32 -- Number of segments for smooth circle
-    local parts = {}
+    local segments = 64 -- Number of segments for smooth circle
+    local circleparts = {}
     
     for i = 1, segments do
-        local angle1 = (i - 1) / segments * math.pi * 2
-        local angle2 = i / segments * math.pi * 2
+        local angle = (i / segments) * math.pi * 2
+        local nextAngle = ((i + 1) / segments) * math.pi * 2
         
-        local x1 = math.cos(angle1) * radius
-        local z1 = math.sin(angle1) * radius
-        local x2 = math.cos(angle2) * radius
-        local z2 = math.sin(angle2) * radius
+        local x1 = math.cos(angle) * radius
+        local z1 = math.sin(angle) * radius
+        local x2 = math.cos(nextAngle) * radius
+        local z2 = math.sin(nextAngle) * radius
         
         -- Calculate segment position and size
         local midX = (x1 + x2) / 2
         local midZ = (z1 + z2) / 2
         local length = math.sqrt((x2 - x1)^2 + (z2 - z1)^2)
         
-        -- Create segment part
         local segment = Instance.new("Part")
         segment.Name = "CircleSegment"
-        segment.Size = Vector3.new(0.3, 0.3, length) -- Thin outline
+        segment.Size = Vector3.new(0.15, 0.15, length) -- Thin outline
         segment.Anchored = true
         segment.CanCollide = false
         segment.Material = Enum.Material.SmoothPlastic
         segment.Transparency = 0
         
         -- Position and rotate segment
-        local segmentCFrame = hrp.CFrame * CFrame.new(midX, 0, midZ)
-        local lookAt = CFrame.lookAt(Vector3.new(x1, 0, z1), Vector3.new(x2, 0, z2))
-        segment.CFrame = segmentCFrame * CFrame.Angles(0, math.atan2(z2 - z1, x2 - x1), 0)
+        local segmentAngle = math.atan2(z2 - z1, x2 - x1)
+        segment.CFrame = hrp.CFrame * CFrame.new(midX, 0, midZ) * CFrame.Angles(0, segmentAngle, 0)
         
         segment.Parent = Workspace
-        table.insert(parts, segment)
+        table.insert(circleparts, segment)
     end
     
-    detectionCircles[character] = parts
-    
-    return parts
+    detectionCircles[character] = circleparts
 end
 
 -- Remove detection circle
@@ -108,58 +106,46 @@ local function removeDetectionCircle(character)
     end
 end
 
--- Update circle colors and visibility based on distance
-local function updateCircleColors()
+-- Update circle colors and position
+local function updateCircles()
     for character, parts in pairs(detectionCircles) do
-        if character and character.Parent and parts then
+        if character and character.Parent then
             local distance = getDistance(character)
             local radius = AutoDefuseSettings.DetectionRadius or 30
+            local color = distance <= radius and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
             
-            -- Determine color
-            local color
-            if distance <= radius then
-                color = Color3.fromRGB(0, 255, 0) -- Green - in range
-            else
-                color = Color3.fromRGB(255, 0, 0) -- Red - out of range
-            end
-            
-            -- Update all segments
+            -- Update position and color
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local segments = #parts
-                
-                for i, part in pairs(parts) do
-                    if part and part.Parent then
-                        part.Color = color
+                for i, segment in pairs(parts) do
+                    if segment and segment.Parent then
+                        segment.Color = color
                         
-                        -- Update position based on new radius
-                        local angle1 = (i - 1) / segments * math.pi * 2
-                        local angle2 = i / segments * math.pi * 2
+                        -- Recalculate position
+                        local angle = (i / segments) * math.pi * 2
+                        local nextAngle = ((i + 1) / segments) * math.pi * 2
                         
-                        local x1 = math.cos(angle1) * radius
-                        local z1 = math.sin(angle1) * radius
-                        local x2 = math.cos(angle2) * radius
-                        local z2 = math.sin(angle2) * radius
+                        local x1 = math.cos(angle) * radius
+                        local z1 = math.sin(angle) * radius
+                        local x2 = math.cos(nextAngle) * radius
+                        local z2 = math.sin(nextAngle) * radius
                         
                         local midX = (x1 + x2) / 2
                         local midZ = (z1 + z2) / 2
                         local length = math.sqrt((x2 - x1)^2 + (z2 - z1)^2)
                         
-                        part.Size = Vector3.new(0.3, 0.3, length)
-                        local segmentCFrame = hrp.CFrame * CFrame.new(midX, 0, midZ)
-                        part.CFrame = segmentCFrame * CFrame.Angles(0, math.atan2(z2 - z1, x2 - x1), 0)
+                        segment.Size = Vector3.new(0.15, 0.15, length)
                         
-                        -- Toggle visibility based on ShowCircle setting
-                        part.Transparency = AutoDefuseSettings.ShowCircle and 0 or 1
+                        local segmentAngle = math.atan2(z2 - z1, x2 - x1)
+                        segment.CFrame = hrp.CFrame * CFrame.new(midX, 0, midZ) * CFrame.Angles(0, segmentAngle, 0)
                     end
                 end
             end
         else
             -- Character removed, clean up
-            if parts then
-                for _, part in pairs(parts) do
-                    if part then part:Destroy() end
-                end
+            for _, part in pairs(parts) do
+                if part then part:Destroy() end
             end
             detectionCircles[character] = nil
         end
@@ -192,20 +178,22 @@ local function hookCharacter(character)
         
         -- Check if it's a defuse animation
         if isDefuseAnimation(numericId) then
-            -- Create circle for this character (always shown, even if ShowCircle is false)
-            createDetectionCircle(character)
+            -- Create circle for this character if ShowCircle is enabled
+            if AutoDefuseSettings.ShowCircle then
+                createDetectionCircle(character)
+            end
             
             -- Check distance
             local radius = AutoDefuseSettings.DetectionRadius or 30
             local distance = getDistance(character)
             
             if distance <= radius then
-                local delayMs = AutoDefuseSettings.Delay or 3000
-                
                 print("DEFUSE ANIMATION DETECTED!")
                 print("Character:", character.Name)
                 print("Distance:", math.floor(distance), "studs")
-                print("Waiting", delayMs, "milliseconds...")
+                
+                local delayMs = AutoDefuseSettings.Delay or 3000
+                print("Waiting", delayMs, "ms...")
                 
                 -- Wait for delay (convert ms to seconds)
                 task.wait(delayMs / 1000)
@@ -218,14 +206,18 @@ local function hookCharacter(character)
                 print("Defused! (Clicked)")
                 
                 -- Remove circle after 2 seconds
-                task.wait(2)
-                removeDetectionCircle(character)
+                if AutoDefuseSettings.ShowCircle then
+                    task.wait(2)
+                    removeDetectionCircle(character)
+                end
             else
                 print("Too far away:", math.floor(distance), "studs (need ≤" .. radius .. ")")
                 
                 -- Remove circle after 2 seconds
-                task.wait(2)
-                removeDetectionCircle(character)
+                if AutoDefuseSettings.ShowCircle then
+                    task.wait(2)
+                    removeDetectionCircle(character)
+                end
             end
         end
     end)
@@ -265,10 +257,10 @@ local function startMonitoring()
         end
     end)
     
-    -- Update circle colors every frame
+    -- Update circles every frame
     circleUpdateConnection = RunService.Heartbeat:Connect(function()
-        if AutoDefuseSettings.Enabled then
-            updateCircleColors()
+        if AutoDefuseSettings.Enabled and AutoDefuseSettings.ShowCircle then
+            updateCircles()
         end
     end)
     
