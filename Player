@@ -17,7 +17,8 @@ getgenv().PlayerSettings = {
     JumppowerValue = 50,
     Noclip = false,
     Invisible = false,
-    InvisibleYOffset = -2 -- Y offset for invisible
+    InvisibleYOffset = -2, -- Y offset for invisible
+    KeepOnGround = false -- Keep player on ground during invisible
 }
 
 -- Connections
@@ -236,6 +237,27 @@ local function toggleInvisible()
                     invisiblePosition = invisiblePosition + moveDirection
                 end
                 
+                -- Keep on ground if enabled
+                if getgenv().PlayerSettings.KeepOnGround then
+                    local rayOrigin = invisiblePosition + Vector3.new(0, 5, 0)
+                    local rayDirection = Vector3.new(0, -100, 0)
+                    
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+                    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                    
+                    local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                    
+                    if rayResult then
+                        -- Snap to ground position
+                        invisiblePosition = Vector3.new(
+                            invisiblePosition.X,
+                            rayResult.Position.Y,
+                            invisiblePosition.Z
+                        )
+                    end
+                end
+                
                 -- Lock character to invisible position
                 root.CFrame = CFrame.new(invisiblePosition)
                 root.Velocity = Vector3.new(0, 0, 0)
@@ -259,6 +281,45 @@ function PlayerModule.CreateUI(parent)
     playerContent.Parent = parent
     
     local yPos = 10
+    
+    -- Helper function to create checkbox
+    local function createCheckbox(name, settingsTable, settingKey, position)
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(1, -20, 0, 35)
+        container.Position = UDim2.new(0, 10, 0, position)
+        container.BackgroundTransparency = 1
+        container.Parent = playerContent
+        
+        local checkbox = Instance.new("TextButton")
+        checkbox.Size = UDim2.new(0, 25, 0, 25)
+        checkbox.Position = UDim2.new(0, 0, 0, 5)
+        checkbox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        checkbox.BorderSizePixel = 1
+        checkbox.BorderColor3 = Color3.fromRGB(255, 255, 255)
+        checkbox.Text = settingsTable[settingKey] and "✓" or ""
+        checkbox.Font = Enum.Font.GothamBold
+        checkbox.TextSize = 18
+        checkbox.TextColor3 = Color3.fromRGB(0, 255, 0)
+        checkbox.Parent = container
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -35, 1, 0)
+        label.Position = UDim2.new(0, 35, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = name
+        label.Font = Enum.Font.Gotham
+        label.TextSize = 12
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = container
+        
+        checkbox.MouseButton1Click:Connect(function()
+            settingsTable[settingKey] = not settingsTable[settingKey]
+            checkbox.Text = settingsTable[settingKey] and "✓" or ""
+        end)
+        
+        return position + 45
+    end
     
     -- Helper function to create toggle button
     local function createToggleButton(name, settingsTable, settingKey, position, callback)
@@ -422,6 +483,7 @@ function PlayerModule.CreateUI(parent)
     
     yPos = createToggleButton("Invisible", getgenv().PlayerSettings, "Invisible", yPos, toggleInvisible)
     yPos = createSlider("Y Offset", getgenv().PlayerSettings, "InvisibleYOffset", -10, 10, yPos)
+    yPos = createCheckbox("Keep On Ground", getgenv().PlayerSettings, "KeepOnGround", yPos)
     
     local invisNote = Instance.new("TextLabel")
     invisNote.Size = UDim2.new(1, -20, 0, 40)
