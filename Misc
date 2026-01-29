@@ -348,7 +348,6 @@ local function updateArrowBillboards()
             local partPos = data.part.Position
             local direction = (partPos - playerPos).Unit
             
-            -- Determine primary direction
             local absX = math.abs(direction.X)
             local absZ = math.abs(direction.Z)
             
@@ -375,7 +374,6 @@ local function applyRingFormation()
         return
     end
     
-    -- Clear old ring parts
     for _, data in ipairs(ringParts) do
         if data.part and data.part.Parent then
             if data.bp then data.bp:Destroy() end
@@ -388,7 +386,6 @@ local function applyRingFormation()
     local playerPos = player.Character.HumanoidRootPart.Position
     
     for index, part in ipairs(unanchoredParts) do
-        -- Remove any existing forces
         for _, child in ipairs(part:GetChildren()) do
             if child:IsA("BodyPosition") or child:IsA("BodyGyro") then
                 child:Destroy()
@@ -434,8 +431,6 @@ local function updateRingFormation()
     for _, data in ipairs(ringParts) do
         if data.part and data.part.Parent and data.bp and data.bp.Parent then
             local offset = calculateRingPosition(data.index, #ringParts)
-            
-            -- Apply rotation to offset
             local rotatedOffset = CFrame.Angles(0, ringRotation, 0):VectorToWorldSpace(offset)
             
             data.bp.Position = playerPos + rotatedOffset
@@ -592,8 +587,10 @@ function MiscModule.CreateUI(parent)
     controllerTitle.Parent = miscContent
     yPos = yPos + 40
     
+    -- Declare button variables FIRST
     local moveToolBtn
     local rotateToolBtn
+    local ringBtn
     
     moveToolBtn, yPos = createButton("Move Tool", yPos, Color3.fromRGB(100, 100, 100), function()
         moveToolEnabled = not moveToolEnabled
@@ -685,7 +682,7 @@ function MiscModule.CreateUI(parent)
         end
     end)
     
-    local resetBtn, yPos = createButton("Reset Rotation", yPos, Color3.fromRGB(80, 80, 80), function()
+    yPos = createButton("Reset Rotation", yPos, Color3.fromRGB(80, 80, 80), function()
         if selectedPart and #selectedConnectedParts > 0 then
             for _, connectedPart in ipairs(selectedConnectedParts) do
                 if connectedPart and connectedPart.Parent then
@@ -698,7 +695,7 @@ function MiscModule.CreateUI(parent)
         end
     end)
     
-    local clearBtn, yPos = createButton("Clear All Forces", yPos, Color3.fromRGB(60, 60, 60), function()
+    yPos = createButton("Clear All Forces", yPos, Color3.fromRGB(60, 60, 60), function()
         for _, part in ipairs(game.Workspace:GetDescendants()) do
             if part:IsA("BasePart") then
                 for _, child in ipairs(part:GetChildren()) do
@@ -727,7 +724,7 @@ function MiscModule.CreateUI(parent)
     ringTitle.Parent = miscContent
     yPos = yPos + 40
     
-    local ringBtn, yPos = createButton("Ring Shape", yPos, Color3.fromRGB(100, 100, 100), function()
+    ringBtn, yPos = createButton("Ring Shape", yPos, Color3.fromRGB(100, 100, 100), function()
         ringEnabled = not ringEnabled
         
         if ringEnabled then
