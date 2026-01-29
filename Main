@@ -297,14 +297,16 @@ local function createSidebarButton(name, color, borderColor, decalId, position)
             if btn:IsA("TextButton") then
                 btn.BackgroundTransparency = 0.3
                 local img = btn:FindFirstChild("DecalBackground")
-                if img then
-                    img.ImageTransparency = 0.75
+                if img and img:IsA("ImageLabel") then
+                    img.ImageTransparency = 0.99
                 end
             end
         end
         
         button.BackgroundTransparency = 0.1
-        imageLabel.ImageTransparency = 0.5
+        if imageLabel and imageLabel:IsA("ImageLabel") then
+            imageLabel.ImageTransparency = 0.5
+        end
         selectedButton = button
         
         wait(0.2)
@@ -316,8 +318,10 @@ local function createSidebarButton(name, color, borderColor, decalId, position)
             local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
             local tween = TweenService:Create(button, tweenInfo, {BackgroundTransparency = 0.15})
             tween:Play()
-            local imageTween = TweenService:Create(imageLabel, tweenInfo, {ImageTransparency = 0.6})
-            imageTween:Play()
+            if imageLabel and imageLabel:IsA("ImageLabel") then
+                local imageTween = TweenService:Create(imageLabel, tweenInfo, {ImageTransparency = 0.6})
+                imageTween:Play()
+            end
         end
     end)
     
@@ -326,8 +330,10 @@ local function createSidebarButton(name, color, borderColor, decalId, position)
             local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
             local tween = TweenService:Create(button, tweenInfo, {BackgroundTransparency = 0.3})
             tween:Play()
-            local imageTween = TweenService:Create(imageLabel, tweenInfo, {ImageTransparency = 0.75})
-            imageTween:Play()
+            if imageLabel and imageLabel:IsA("ImageLabel") then
+                local imageTween = TweenService:Create(imageLabel, tweenInfo, {ImageTransparency = 0.99})
+                imageTween:Play()
+            end
         end
     end)
     
