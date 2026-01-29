@@ -682,7 +682,7 @@ function MiscModule.CreateUI(parent)
         end
     end)
     
-    yPos = createButton("Reset Rotation", yPos, Color3.fromRGB(80, 80, 80), function()
+    local resetBtn, newYPos = createButton("Reset Rotation", yPos, Color3.fromRGB(80, 80, 80), function()
         if selectedPart and #selectedConnectedParts > 0 then
             for _, connectedPart in ipairs(selectedConnectedParts) do
                 if connectedPart and connectedPart.Parent then
@@ -694,8 +694,9 @@ function MiscModule.CreateUI(parent)
             end
         end
     end)
+    yPos = newYPos
     
-    yPos = createButton("Clear All Forces", yPos, Color3.fromRGB(60, 60, 60), function()
+    local clearBtn, newYPos = createButton("Clear All Forces", yPos, Color3.fromRGB(60, 60, 60), function()
         for _, part in ipairs(game.Workspace:GetDescendants()) do
             if part:IsA("BasePart") then
                 for _, child in ipairs(part:GetChildren()) do
@@ -708,6 +709,7 @@ function MiscModule.CreateUI(parent)
         deselectPart()
         clearRingFormation()
     end)
+    yPos = newYPos
     
     yPos = yPos + 20
     
