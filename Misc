@@ -502,6 +502,124 @@ function MiscModule.CreateUI(parent)
     safeNosInfo.Parent = miscContent
     yPos = yPos + 50
     
+    -- DISABLE AAS Section
+    local disableAASTitle = Instance.new("TextLabel")
+    disableAASTitle.Size = UDim2.new(1, -20, 0, 30)
+    disableAASTitle.Position = UDim2.new(0, 10, 0, yPos)
+    disableAASTitle.BackgroundTransparency = 1
+    disableAASTitle.Text = "DISABLE AAS"
+    disableAASTitle.Font = Enum.Font.GothamBlack
+    disableAASTitle.TextSize = 16
+    disableAASTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    disableAASTitle.TextXAlignment = Enum.TextXAlignment.Left
+    disableAASTitle.Parent = miscContent
+    yPos = yPos + 40
+    
+    local disableAASBtn
+    disableAASBtn, yPos = createButton("Disable AAS", yPos, Color3.fromRGB(100, 100, 100), function(button)
+        if getgenv().DisableAASEnabled then
+            getgenv().DisableAASEnabled = false
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            button.Text = "Disable AAS"
+            
+            if getgenv().DisableAASConnection then
+                getgenv().DisableAASConnection:Disconnect()
+                getgenv().DisableAASConnection = nil
+            end
+        else
+            getgenv().DisableAASEnabled = true
+            button.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+            button.Text = "Disable AAS (ON)"
+            
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
+            
+            getgenv().DisableAASConnection = task.spawn(function()
+                while getgenv().DisableAASEnabled do
+                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        local hrp = LocalPlayer.Character.HumanoidRootPart
+                        
+                        -- Set Y offset to 3
+                        hrp.CFrame = hrp.CFrame + Vector3.new(0, 3, 0)
+                        
+                        -- Flip player if enabled
+                        if getgenv().FlipPlayerEnabled then
+                            hrp.CFrame = hrp.CFrame * CFrame.Angles(math.pi, 0, 0)
+                        end
+                    end
+                    
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end)
+    
+    -- Flip Player Checkbox
+    local flipContainer = Instance.new("Frame")
+    flipContainer.Size = UDim2.new(1, -20, 0, 30)
+    flipContainer.Position = UDim2.new(0, 10, 0, yPos)
+    flipContainer.BackgroundTransparency = 1
+    flipContainer.Parent = miscContent
+    
+    local flipCheckbox = Instance.new("TextButton")
+    flipCheckbox.Size = UDim2.new(0, 25, 0, 25)
+    flipCheckbox.Position = UDim2.new(0, 0, 0, 0)
+    flipCheckbox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    flipCheckbox.BorderSizePixel = 1
+    flipCheckbox.BorderColor3 = Color3.fromRGB(255, 255, 255)
+    flipCheckbox.Text = ""
+    flipCheckbox.Parent = flipContainer
+    
+    local checkmark = Instance.new("TextLabel")
+    checkmark.Size = UDim2.new(1, 0, 1, 0)
+    checkmark.BackgroundTransparency = 1
+    checkmark.Text = ""
+    checkmark.Font = Enum.Font.GothamBold
+    checkmark.TextSize = 18
+    checkmark.TextColor3 = Color3.fromRGB(0, 255, 0)
+    checkmark.Parent = flipCheckbox
+    
+    local flipLabel = Instance.new("TextLabel")
+    flipLabel.Size = UDim2.new(1, -35, 1, 0)
+    flipLabel.Position = UDim2.new(0, 35, 0, 0)
+    flipLabel.BackgroundTransparency = 1
+    flipLabel.Text = "Flip Player"
+    flipLabel.Font = Enum.Font.GothamBold
+    flipLabel.TextSize = 12
+    flipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    flipLabel.TextXAlignment = Enum.TextXAlignment.Left
+    flipLabel.Parent = flipContainer
+    
+    getgenv().FlipPlayerEnabled = false
+    
+    flipCheckbox.MouseButton1Click:Connect(function()
+        getgenv().FlipPlayerEnabled = not getgenv().FlipPlayerEnabled
+        
+        if getgenv().FlipPlayerEnabled then
+            checkmark.Text = "✓"
+            flipCheckbox.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+        else
+            checkmark.Text = ""
+            flipCheckbox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end
+    end)
+    
+    yPos = yPos + 40
+    
+    local aasInfo = Instance.new("TextLabel")
+    aasInfo.Size = UDim2.new(1, -20, 0, 40)
+    aasInfo.Position = UDim2.new(0, 10, 0, yPos)
+    aasInfo.BackgroundTransparency = 1
+    aasInfo.Text = "Moves you up by 3 studs every 0.5s\nOptionally flips character upside down"
+    aasInfo.Font = Enum.Font.Gotham
+    aasInfo.TextSize = 11
+    aasInfo.TextColor3 = Color3.fromRGB(200, 200, 200)
+    aasInfo.TextXAlignment = Enum.TextXAlignment.Left
+    aasInfo.TextYAlignment = Enum.TextYAlignment.Top
+    aasInfo.TextWrapped = true
+    aasInfo.Parent = miscContent
+    yPos = yPos + 50
+    
     miscContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 20)
 end
 
@@ -518,6 +636,16 @@ function MiscModule.Cleanup()
         getgenv().SafeNOSConnection = nil
     end
     getgenv().SafeNOSEnabled = false
+    
+    -- Cleanup Disable AAS
+    if getgenv().DisableAASConnection then
+        pcall(function()
+            task.cancel(getgenv().DisableAASConnection)
+        end)
+        getgenv().DisableAASConnection = nil
+    end
+    getgenv().DisableAASEnabled = false
+    getgenv().FlipPlayerEnabled = false
 end
 
 return MiscModule
