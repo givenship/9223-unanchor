@@ -1,1 +1,280 @@
+-- Ring Shape Module
+-- Forms parts into a ring around the player
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+local RingShapeModule = {}
+
+-- Variables
+local ringEnabled = false
+local ringParts = {}
+local ringRadius = 10
+local ringHeight = 3
+local ringRotation = 0
+local ringUpdateConnection = nil
+local arrowBillboards = {}
+
+-- Helper Functions
+local function isBodyPart(part)
+    local bodyPartNames = {"Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg", "HumanoidRootPart"}
+    for _, name in ipairs(bodyPartNames) do
+        if part.Name == name then
+            return true
+        end
+    end
+    return false
+end
+
+local function collectUnanchoredParts()
+    local parts = {}
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if (part:IsA("BasePart") or part:IsA("UnionOperation")) and not part.Anchored and not isBodyPart(part) then
+            local isPlayerPart = false
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character and part:IsDescendantOf(plr.Character) then
+                    isPlayerPart = true
+                    break
+                end
+            end
+            if not isPlayerPart then
+                table.insert(parts, part)
+            end
+        end
+    end
+    return parts
+end
+
+local function calculateRingPosition(index, totalParts)
+    if totalParts == 0 then return Vector3.new(0, ringHeight, 0) end
+    
+    local angle = (2 * math.pi / totalParts) * index
+    local x = math.cos(angle) * ringRadius
+    local z = math.sin(angle) * ringRadius
+    
+    return Vector3.new(x, ringHeight, z)
+end
+
+local function createArrowBillboard(part, direction)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ArrowBillboard"
+    billboard.Size = UDim2.new(0, 50, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = part
+    billboard.Parent = part
+    
+    local arrow = Instance.new("TextLabel")
+    arrow.Size = UDim2.new(1, 0, 1, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.TextColor3 = Color3.fromRGB(255, 255, 255)
+    arrow.TextSize = 30
+    arrow.Font = Enum.Font.GothamBold
+    arrow.TextStrokeTransparency = 0.5
+    arrow.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    arrow.Parent = billboard
+    
+    if direction == "up" then
+        arrow.Text = "▲"
+    elseif direction == "down" then
+        arrow.Text = "▼"
+    elseif direction == "left" then
+        arrow.Text = "◄"
+    elseif direction == "right" then
+        arrow.Text = "►"
+    end
+    
+    return billboard
+end
+
+local function removeArrowBillboards()
+    for _, billboard in ipairs(arrowBillboards) do
+        if billboard and billboard.Parent then
+            billboard:Destroy()
+        end
+    end
+    arrowBillboards = {}
+end
+
+local function updateArrowBillboards()
+    if not ringEnabled or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    removeArrowBillboards()
+    
+    local playerPos = player.Character.HumanoidRootPart.Position
+    
+    for _, data in ipairs(ringParts) do
+        if data.part and data.part.Parent then
+            local partPos = data.part.Position
+            local direction = (partPos - playerPos).Unit
+            
+            local absX = math.abs(direction.X)
+            local absZ = math.abs(direction.Z)
+            
+            local arrowDirection
+            if absX > absZ then
+                arrowDirection = direction.X > 0 and "right" or "left"
+            else
+                arrowDirection = direction.Z > 0 and "down" or "up"
+            end
+            
+            local billboard = createArrowBillboard(data.part, arrowDirection)
+            table.insert(arrowBillboards, billboard)
+        end
+    end
+end
+
+local function applyRingFormation()
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local unanchoredParts = collectUnanchoredParts()
+    if #unanchoredParts == 0 then
+        return
+    end
+    
+    for _, data in ipairs(ringParts) do
+        if data.part and data.part.Parent then
+            if data.bp then data.bp:Destroy() end
+            if data.bg then data.bg:Destroy() end
+        end
+    end
+    ringParts = {}
+    removeArrowBillboards()
+    
+    local playerPos = player.Character.HumanoidRootPart.Position
+    
+    for index, part in ipairs(unanchoredParts) do
+        for _, child in ipairs(part:GetChildren()) do
+            if child:IsA("BodyPosition") or child:IsA("BodyGyro") then
+                child:Destroy()
+            end
+        end
+        
+        local offset = calculateRingPosition(index - 1, #unanchoredParts)
+        
+        local bp = Instance.new("BodyPosition")
+        bp.Name = "RingPosition"
+        bp.Parent = part
+        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bp.Position = playerPos + offset
+        bp.P = 50000
+        bp.D = 2000
+        
+        local bg = Instance.new("BodyGyro")
+        bg.Name = "RingGyro"
+        bg.Parent = part
+        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bg.CFrame = CFrame.new(part.Position) * CFrame.Angles(0, ringRotation, 0)
+        bg.P = 50000
+        bg.D = 2000
+        
+        table.insert(ringParts, {
+            part = part,
+            bp = bp,
+            bg = bg,
+            index = index - 1
+        })
+    end
+    
+    updateArrowBillboards()
+end
+
+local function updateRingFormation()
+    if not ringEnabled or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local playerPos = player.Character.HumanoidRootPart.Position
+    
+    for _, data in ipairs(ringParts) do
+        if data.part and data.part.Parent and data.bp and data.bp.Parent then
+            local offset = calculateRingPosition(data.index, #ringParts)
+            local rotatedOffset = CFrame.Angles(0, ringRotation, 0):VectorToWorldSpace(offset)
+            
+            data.bp.Position = playerPos + rotatedOffset
+            
+            if data.bg then
+                data.bg.CFrame = CFrame.new(data.part.Position) * CFrame.Angles(0, ringRotation, 0)
+            end
+        end
+    end
+end
+
+local function startRingUpdate()
+    if ringUpdateConnection then return end
+    
+    ringUpdateConnection = RunService.Heartbeat:Connect(function()
+        if ringEnabled then
+            updateRingFormation()
+        end
+    end)
+end
+
+local function stopRingUpdate()
+    if ringUpdateConnection then
+        ringUpdateConnection:Disconnect()
+        ringUpdateConnection = nil
+    end
+end
+
+local function clearRingFormation()
+    for _, data in ipairs(ringParts) do
+        if data.part and data.part.Parent then
+            if data.bp then data.bp:Destroy() end
+            if data.bg then data.bg:Destroy() end
+        end
+    end
+    ringParts = {}
+    removeArrowBillboards()
+    stopRingUpdate()
+end
+
+-- Public Functions
+function RingShapeModule.Enable()
+    if ringEnabled then return end
+    ringEnabled = true
+    applyRingFormation()
+    startRingUpdate()
+end
+
+function RingShapeModule.Disable()
+    ringEnabled = false
+    clearRingFormation()
+end
+
+function RingShapeModule.IsEnabled()
+    return ringEnabled
+end
+
+function RingShapeModule.SetRadius(value)
+    ringRadius = value
+    updateArrowBillboards()
+end
+
+function RingShapeModule.SetHeight(value)
+    ringHeight = value
+end
+
+function RingShapeModule.SetRotation(value)
+    ringRotation = math.rad(value)
+    updateArrowBillboards()
+end
+
+function RingShapeModule.GetRadius()
+    return ringRadius
+end
+
+function RingShapeModule.GetHeight()
+    return ringHeight
+end
+
+function RingShapeModule.GetRotation()
+    return math.deg(ringRotation)
+end
+
+return RingShapeModule
