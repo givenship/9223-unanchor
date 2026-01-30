@@ -330,8 +330,29 @@ function MiscModule.CreateUI(parent)
             rpmTool.Disable()
             button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         else
-            rpmTool.Enable()
-            button.BackgroundColor3 = Color3.fromRGB(255, 100, 200)
+            -- Set function to get selected parts from active tool
+            rpmTool.SetGetSelectedPartsFunction(function()
+                -- Try to get from MoveTool first
+                if LoadedTools.MoveTool and LoadedTools.MoveTool.GetSelectedConnectedParts then
+                    local parts = LoadedTools.MoveTool.GetSelectedConnectedParts()
+                    if #parts > 0 then return parts end
+                end
+                
+                -- Try to get from RotateTool
+                if LoadedTools.RotateTool and LoadedTools.RotateTool.GetSelectedConnectedParts then
+                    local parts = LoadedTools.RotateTool.GetSelectedConnectedParts()
+                    if #parts > 0 then return parts end
+                end
+                
+                return {}
+            end)
+            
+            local success = rpmTool.Enable()
+            if success then
+                button.BackgroundColor3 = Color3.fromRGB(255, 100, 200)
+            else
+                button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            end
         end
     end)
     
