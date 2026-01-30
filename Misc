@@ -1,479 +1,46 @@
 -- Misc Module
--- Part Controller with Ring Formation and Arrow Billboard
+-- Loads tools from GitHub and provides Reset Rotation & Clear All Forces
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local player = Players.LocalPlayer
-local mouse = player:GetMouse()
+local HttpService = game:GetService("HttpService")
 
 local MiscModule = {}
 
--- Part Controller Variables
-local moveToolEnabled = false
-local selectedPart = nil
-local selectionBox = nil
-local handles = nil
-local arcHandles = nil
-local selectedConnectedParts = {}
-local moveMode = "move"
+-- GitHub URLs for tools
+local ToolURLs = {
+    MoveTool = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/MoveTool",
+    RotateTool = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/RotateTool",
+    RingShape = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/RingShape",
+    RPMTool = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/RPMTool"
+}
 
--- Ring Formation Variables
-local ringEnabled = false
-local ringParts = {}
-local ringRadius = 10
-local ringHeight = 3
-local ringRotation = 0
-local ringUpdateConnection = nil
-local arrowBillboards = {}
+-- Loaded tools storage
+local LoadedTools = {}
 
--- Helper Functions
-local function isBodyPart(part)
-    local bodyPartNames = {"Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg", "HumanoidRootPart"}
-    for _, name in ipairs(bodyPartNames) do
-        if part.Name == name then
-            return true
-        end
-    end
-    return false
-end
-
-local function getConnectedParts(part)
-    local connectedParts = {part}
-    local checkedParts = {}
-    local partsToCheck = {part}
-    
-    while #partsToCheck > 0 do
-        local currentPart = table.remove(partsToCheck, 1)
-        if not checkedParts[currentPart] then
-            checkedParts[currentPart] = true
-            
-            for _, child in ipairs(currentPart:GetChildren()) do
-                if child:IsA("Weld") or child:IsA("WeldConstraint") or child:IsA("Motor6D") or child:IsA("ManualWeld") then
-                    local connectedPart = nil
-                    if child.Part0 == currentPart then
-                        connectedPart = child.Part1
-                    elseif child.Part1 == currentPart then
-                        connectedPart = child.Part0
-                    end
-                    
-                    if connectedPart and not checkedParts[connectedPart] then
-                        table.insert(connectedParts, connectedPart)
-                        table.insert(partsToCheck, connectedPart)
-                    end
-                end
-            end
-            
-            for _, joint in ipairs(currentPart:GetJoints()) do
-                local connectedPart = nil
-                if joint.Part0 == currentPart then
-                    connectedPart = joint.Part1
-                elseif joint.Part1 == currentPart then
-                    connectedPart = joint.Part0
-                end
-                
-                if connectedPart and not checkedParts[connectedPart] then
-                    table.insert(connectedParts, connectedPart)
-                    table.insert(partsToCheck, connectedPart)
-                end
-            end
-        end
+-- Function to load tool from GitHub
+local function loadTool(toolName, url)
+    if LoadedTools[toolName] then
+        return LoadedTools[toolName]
     end
     
-    return connectedParts
-end
-
-local function createSelectionBox(part)
-    if selectionBox then
-        selectionBox:Destroy()
-    end
-    
-    local connectedParts = getConnectedParts(part)
-    selectedConnectedParts = connectedParts
-    
-    selectionBox = Instance.new("SelectionBox")
-    selectionBox.Adornee = part
-    selectionBox.Color3 = Color3.fromRGB(0, 170, 255)
-    selectionBox.LineThickness = 0.05
-    selectionBox.Parent = part
-    
-    if handles then
-        handles:Destroy()
-        handles = nil
-    end
-    if arcHandles then
-        arcHandles:Destroy()
-        arcHandles = nil
-    end
-    
-    if moveMode == "move" then
-        handles = Instance.new("Handles")
-        handles.Adornee = part
-        handles.Color3 = Color3.fromRGB(0, 170, 255)
-        handles.Style = Enum.HandlesStyle.Movement
-        handles.Faces = Faces.new(
-            Enum.NormalId.Top,
-            Enum.NormalId.Bottom,
-            Enum.NormalId.Left,
-            Enum.NormalId.Right,
-            Enum.NormalId.Front,
-            Enum.NormalId.Back
-        )
-        handles.Parent = player.PlayerGui
-    elseif moveMode == "rotate" then
-        arcHandles = Instance.new("ArcHandles")
-        arcHandles.Adornee = part
-        arcHandles.Color3 = Color3.fromRGB(255, 100, 100)
-        arcHandles.Axes = Axes.new(
-            Enum.Axis.X,
-            Enum.Axis.Y,
-            Enum.Axis.Z
-        )
-        arcHandles.Parent = player.PlayerGui
-    end
-    
-    for _, connectedPart in ipairs(connectedParts) do
-        if connectedPart and connectedPart.Parent then
-            local bodyPosition = Instance.new("BodyPosition")
-            bodyPosition.Name = "MoveToolPosition"
-            bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bodyPosition.Position = connectedPart.Position
-            bodyPosition.P = 100000
-            bodyPosition.D = 5000
-            bodyPosition.Parent = connectedPart
-            
-            local bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.Name = "MoveToolGyro"
-            bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            bodyGyro.CFrame = connectedPart.CFrame
-            bodyGyro.P = 100000
-            bodyGyro.D = 5000
-            bodyGyro.Parent = connectedPart
-        end
-    end
-    
-    if handles then
-        handles.MouseDrag:Connect(function(face, distance)
-            if selectedPart and selectedPart.Parent and #selectedConnectedParts > 0 then
-                local moveVector = Vector3.new()
-                local adjustedDistance = distance * 0.5
-                
-                if face == Enum.NormalId.Top then
-                    moveVector = Vector3.new(0, adjustedDistance, 0)
-                elseif face == Enum.NormalId.Bottom then
-                    moveVector = Vector3.new(0, -adjustedDistance, 0)
-                elseif face == Enum.NormalId.Right then
-                    moveVector = Vector3.new(adjustedDistance, 0, 0)
-                elseif face == Enum.NormalId.Left then
-                    moveVector = Vector3.new(-adjustedDistance, 0, 0)
-                elseif face == Enum.NormalId.Front then
-                    moveVector = Vector3.new(0, 0, -adjustedDistance)
-                elseif face == Enum.NormalId.Back then
-                    moveVector = Vector3.new(0, 0, adjustedDistance)
-                end
-                
-                for _, connectedPart in ipairs(selectedConnectedParts) do
-                    if connectedPart and connectedPart.Parent then
-                        local bp = connectedPart:FindFirstChild("MoveToolPosition")
-                        if bp and bp:IsA("BodyPosition") then
-                            bp.Position = bp.Position + moveVector
-                        end
-                    end
-                end
-            end
-        end)
-    end
-    
-    if arcHandles then
-        arcHandles.MouseDrag:Connect(function(axis, relativeAngle)
-            if selectedPart and selectedPart.Parent and #selectedConnectedParts > 0 then
-                local rotationCFrame = CFrame.new()
-                
-                if axis == Enum.Axis.X then
-                    rotationCFrame = CFrame.Angles(relativeAngle, 0, 0)
-                elseif axis == Enum.Axis.Y then
-                    rotationCFrame = CFrame.Angles(0, relativeAngle, 0)
-                elseif axis == Enum.Axis.Z then
-                    rotationCFrame = CFrame.Angles(0, 0, relativeAngle)
-                end
-                
-                local centerPart = selectedPart
-                local centerPos = centerPart.Position
-                
-                for _, connectedPart in ipairs(selectedConnectedParts) do
-                    if connectedPart and connectedPart.Parent then
-                        local bg = connectedPart:FindFirstChild("MoveToolGyro")
-                        if bg and bg:IsA("BodyGyro") then
-                            local offset = connectedPart.Position - centerPos
-                            local rotatedOffset = rotationCFrame:VectorToWorldSpace(offset)
-                            
-                            local bp = connectedPart:FindFirstChild("MoveToolPosition")
-                            if bp then
-                                bp.Position = centerPos + rotatedOffset
-                            end
-                            
-                            bg.CFrame = bg.CFrame * rotationCFrame
-                        end
-                    end
-                end
-            end
-        end)
-    end
-end
-
-local function removeSelectionBox()
-    if selectedPart and selectedPart.Parent then
-        for _, connectedPart in ipairs(selectedConnectedParts) do
-            if connectedPart and connectedPart.Parent then
-                local bp = connectedPart:FindFirstChild("MoveToolPosition")
-                if bp then bp:Destroy() end
-                
-                local bg = connectedPart:FindFirstChild("MoveToolGyro")
-                if bg then bg:Destroy() end
-            end
-        end
-    end
-    
-    selectedConnectedParts = {}
-    
-    if selectionBox then
-        selectionBox:Destroy()
-        selectionBox = nil
-    end
-    
-    if handles then
-        handles:Destroy()
-        handles = nil
-    end
-    
-    if arcHandles then
-        arcHandles:Destroy()
-        arcHandles = nil
-    end
-end
-
-local function selectPart(part)
-    if selectedPart == part then return end
-    selectedPart = part
-    createSelectionBox(part)
-end
-
-local function deselectPart()
-    selectedPart = nil
-    removeSelectionBox()
-end
-
--- Ring Formation Functions
-local function collectUnanchoredParts()
-    local parts = {}
-    for _, part in ipairs(workspace:GetDescendants()) do
-        if (part:IsA("BasePart") or part:IsA("UnionOperation")) and not part.Anchored and not isBodyPart(part) then
-            local isPlayerPart = false
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr.Character and part:IsDescendantOf(plr.Character) then
-                    isPlayerPart = true
-                    break
-                end
-            end
-            if not isPlayerPart then
-                table.insert(parts, part)
-            end
-        end
-    end
-    return parts
-end
-
-local function calculateRingPosition(index, totalParts)
-    if totalParts == 0 then return Vector3.new(0, ringHeight, 0) end
-    
-    local angle = (2 * math.pi / totalParts) * index
-    local x = math.cos(angle) * ringRadius
-    local z = math.sin(angle) * ringRadius
-    
-    return Vector3.new(x, ringHeight, z)
-end
-
-local function createArrowBillboard(part, direction)
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ArrowBillboard"
-    billboard.Size = UDim2.new(0, 50, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Adornee = part
-    billboard.Parent = part
-    
-    local arrow = Instance.new("TextLabel")
-    arrow.Size = UDim2.new(1, 0, 1, 0)
-    arrow.BackgroundTransparency = 1
-    arrow.TextColor3 = Color3.fromRGB(255, 255, 255)
-    arrow.TextSize = 30
-    arrow.Font = Enum.Font.GothamBold
-    arrow.TextStrokeTransparency = 0.5
-    arrow.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    arrow.Parent = billboard
-    
-    if direction == "up" then
-        arrow.Text = "▲"
-    elseif direction == "down" then
-        arrow.Text = "▼"
-    elseif direction == "left" then
-        arrow.Text = "◄"
-    elseif direction == "right" then
-        arrow.Text = "►"
-    end
-    
-    return billboard
-end
-
-local function removeArrowBillboards()
-    for _, billboard in ipairs(arrowBillboards) do
-        if billboard and billboard.Parent then
-            billboard:Destroy()
-        end
-    end
-    arrowBillboards = {}
-end
-
-local function updateArrowBillboards()
-    if not ringEnabled or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-        return
-    end
-    
-    removeArrowBillboards()
-    
-    local playerPos = player.Character.HumanoidRootPart.Position
-    
-    for _, data in ipairs(ringParts) do
-        if data.part and data.part.Parent then
-            local partPos = data.part.Position
-            local direction = (partPos - playerPos).Unit
-            
-            local absX = math.abs(direction.X)
-            local absZ = math.abs(direction.Z)
-            
-            local arrowDirection
-            if absX > absZ then
-                arrowDirection = direction.X > 0 and "right" or "left"
-            else
-                arrowDirection = direction.Z > 0 and "down" or "up"
-            end
-            
-            local billboard = createArrowBillboard(data.part, arrowDirection)
-            table.insert(arrowBillboards, billboard)
-        end
-    end
-end
-
-local function applyRingFormation()
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-        return
-    end
-    
-    local unanchoredParts = collectUnanchoredParts()
-    if #unanchoredParts == 0 then
-        return
-    end
-    
-    for _, data in ipairs(ringParts) do
-        if data.part and data.part.Parent then
-            if data.bp then data.bp:Destroy() end
-            if data.bg then data.bg:Destroy() end
-        end
-    end
-    ringParts = {}
-    removeArrowBillboards()
-    
-    local playerPos = player.Character.HumanoidRootPart.Position
-    
-    for index, part in ipairs(unanchoredParts) do
-        for _, child in ipairs(part:GetChildren()) do
-            if child:IsA("BodyPosition") or child:IsA("BodyGyro") then
-                child:Destroy()
-            end
-        end
-        
-        local offset = calculateRingPosition(index - 1, #unanchoredParts)
-        
-        local bp = Instance.new("BodyPosition")
-        bp.Name = "RingPosition"
-        bp.Parent = part
-        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bp.Position = playerPos + offset
-        bp.P = 50000
-        bp.D = 2000
-        
-        local bg = Instance.new("BodyGyro")
-        bg.Name = "RingGyro"
-        bg.Parent = part
-        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        bg.CFrame = CFrame.new(part.Position) * CFrame.Angles(0, ringRotation, 0)
-        bg.P = 50000
-        bg.D = 2000
-        
-        table.insert(ringParts, {
-            part = part,
-            bp = bp,
-            bg = bg,
-            index = index - 1
-        })
-    end
-    
-    updateArrowBillboards()
-end
-
-local function updateRingFormation()
-    if not ringEnabled or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-        return
-    end
-    
-    local playerPos = player.Character.HumanoidRootPart.Position
-    
-    for _, data in ipairs(ringParts) do
-        if data.part and data.part.Parent and data.bp and data.bp.Parent then
-            local offset = calculateRingPosition(data.index, #ringParts)
-            local rotatedOffset = CFrame.Angles(0, ringRotation, 0):VectorToWorldSpace(offset)
-            
-            data.bp.Position = playerPos + rotatedOffset
-            
-            if data.bg then
-                data.bg.CFrame = CFrame.new(data.part.Position) * CFrame.Angles(0, ringRotation, 0)
-            end
-        end
-    end
-end
-
-local function startRingUpdate()
-    if ringUpdateConnection then return end
-    
-    ringUpdateConnection = RunService.Heartbeat:Connect(function()
-        if ringEnabled then
-            updateRingFormation()
-        end
+    local success, result = pcall(function()
+        return game:HttpGet(url)
     end)
-end
-
-local function stopRingUpdate()
-    if ringUpdateConnection then
-        ringUpdateConnection:Disconnect()
-        ringUpdateConnection = nil
-    end
-end
-
-local function clearRingFormation()
-    for _, data in ipairs(ringParts) do
-        if data.part and data.part.Parent then
-            if data.bp then data.bp:Destroy() end
-            if data.bg then data.bg:Destroy() end
+    
+    if success then
+        local toolFunc, err = loadstring(result)
+        if toolFunc then
+            local tool = toolFunc()
+            LoadedTools[toolName] = tool
+            return tool
+        else
+            warn("Error loading " .. toolName .. ": " .. tostring(err))
+            return nil
         end
+    else
+        warn("Failed to download " .. toolName)
+        return nil
     end
-    ringParts = {}
-    removeArrowBillboards()
-    stopRingUpdate()
 end
-
--- Mouse and Keyboard
-local mouseConnection
-local keyConnection
 
 function MiscModule.CreateUI(parent)
     local miscContent = Instance.new("ScrollingFrame")
@@ -545,15 +112,15 @@ function MiscModule.CreateUI(parent)
             dragging = true
         end)
         
-        UserInputService.InputEnded:Connect(function(input)
+        game:GetService("UserInputService").InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = false
             end
         end)
         
-        RunService.RenderStepped:Connect(function()
+        game:GetService("RunService").RenderStepped:Connect(function()
             if dragging then
-                local mousePos = UserInputService:GetMouseLocation()
+                local mousePos = game:GetService("UserInputService"):GetMouseLocation()
                 local relativeX = math.clamp(mousePos.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
                 local percentage = relativeX / sliderBg.AbsoluteSize.X
                 local value = minVal + (maxVal - minVal) * percentage
@@ -587,103 +154,64 @@ function MiscModule.CreateUI(parent)
     controllerTitle.Parent = miscContent
     yPos = yPos + 40
     
-    -- Declare button variables FIRST
+    -- Declare button variables
     local moveToolBtn
     local rotateToolBtn
     local ringBtn
+    local spinBtn
     
+    -- Move Tool Button
     moveToolBtn, yPos = createButton("Move Tool", yPos, Color3.fromRGB(100, 100, 100), function()
-        moveToolEnabled = not moveToolEnabled
-        moveMode = "move"
+        local moveTool = loadTool("MoveTool", ToolURLs.MoveTool)
+        if not moveTool then return end
         
-        if moveToolEnabled then
+        if moveTool.IsEnabled() then
+            moveTool.Disable()
+            moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        else
+            -- Disable other tools
+            if LoadedTools.RotateTool and LoadedTools.RotateTool.IsEnabled() then
+                LoadedTools.RotateTool.Disable()
+                rotateToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            end
+            
+            moveTool.Enable()
             moveToolBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 220)
-            rotateToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-            
-            mouseConnection = mouse.Button1Down:Connect(function()
-                if not moveToolEnabled then return end
-                local target = mouse.Target
-                if target and (target:IsA("BasePart") or target:IsA("UnionOperation")) then
-                    local isPlayerPart = false
-                    for _, plr in ipairs(Players:GetPlayers()) do
-                        if plr.Character and target:IsDescendantOf(plr.Character) then
-                            isPlayerPart = true
-                            break
-                        end
-                    end
-                    if target.Anchored == false and not isPlayerPart and not isBodyPart(target) then
-                        selectPart(target)
-                    end
-                end
-            end)
-            
-            keyConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                if gameProcessed then return end
-                if not moveToolEnabled then return end
-                if input.KeyCode == Enum.KeyCode.Delete and selectedPart and selectedPart.Parent then
-                    selectedPart:Destroy()
-                    deselectPart()
-                elseif input.KeyCode == Enum.KeyCode.Escape and selectedPart then
-                    deselectPart()
-                end
-            end)
-            
-            if selectedPart then createSelectionBox(selectedPart) end
-        else
-            moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-            if mouseConnection then mouseConnection:Disconnect() end
-            if keyConnection then keyConnection:Disconnect() end
-            deselectPart()
         end
     end)
     
+    -- Rotate Tool Button
     rotateToolBtn, yPos = createButton("Rotate Tool", yPos, Color3.fromRGB(100, 100, 100), function()
-        moveToolEnabled = not moveToolEnabled
-        moveMode = "rotate"
+        local rotateTool = loadTool("RotateTool", ToolURLs.RotateTool)
+        if not rotateTool then return end
         
-        if moveToolEnabled then
-            rotateToolBtn.BackgroundColor3 = Color3.fromRGB(220, 100, 50)
-            moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-            
-            mouseConnection = mouse.Button1Down:Connect(function()
-                if not moveToolEnabled then return end
-                local target = mouse.Target
-                if target and (target:IsA("BasePart") or target:IsA("UnionOperation")) then
-                    local isPlayerPart = false
-                    for _, plr in ipairs(Players:GetPlayers()) do
-                        if plr.Character and target:IsDescendantOf(plr.Character) then
-                            isPlayerPart = true
-                            break
-                        end
-                    end
-                    if target.Anchored == false and not isPlayerPart and not isBodyPart(target) then
-                        selectPart(target)
-                    end
-                end
-            end)
-            
-            keyConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                if gameProcessed then return end
-                if not moveToolEnabled then return end
-                if input.KeyCode == Enum.KeyCode.Delete and selectedPart and selectedPart.Parent then
-                    selectedPart:Destroy()
-                    deselectPart()
-                elseif input.KeyCode == Enum.KeyCode.Escape and selectedPart then
-                    deselectPart()
-                end
-            end)
-            
-            if selectedPart then createSelectionBox(selectedPart) end
-        else
+        if rotateTool.IsEnabled() then
+            rotateTool.Disable()
             rotateToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-            if mouseConnection then mouseConnection:Disconnect() end
-            if keyConnection then keyConnection:Disconnect() end
-            deselectPart()
+        else
+            -- Disable other tools
+            if LoadedTools.MoveTool and LoadedTools.MoveTool.IsEnabled() then
+                LoadedTools.MoveTool.Disable()
+                moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            end
+            
+            rotateTool.Enable()
+            rotateToolBtn.BackgroundColor3 = Color3.fromRGB(220, 100, 50)
         end
     end)
     
-    local resetBtn, newYPos = createButton("Reset Rotation", yPos, Color3.fromRGB(80, 80, 80), function()
-        if selectedPart and #selectedConnectedParts > 0 then
+    -- Reset Rotation Button (Built-in)
+    local resetBtn, yPos2 = createButton("Reset Rotation", yPos, Color3.fromRGB(80, 80, 80), function()
+        -- Try to get selected parts from MoveTool or RotateTool
+        local selectedConnectedParts = {}
+        
+        if LoadedTools.MoveTool and LoadedTools.MoveTool.GetSelectedConnectedParts then
+            selectedConnectedParts = LoadedTools.MoveTool.GetSelectedConnectedParts()
+        elseif LoadedTools.RotateTool and LoadedTools.RotateTool.GetSelectedConnectedParts then
+            selectedConnectedParts = LoadedTools.RotateTool.GetSelectedConnectedParts()
+        end
+        
+        if #selectedConnectedParts > 0 then
             for _, connectedPart in ipairs(selectedConnectedParts) do
                 if connectedPart and connectedPart.Parent then
                     local bg = connectedPart:FindFirstChild("MoveToolGyro")
@@ -692,26 +220,42 @@ function MiscModule.CreateUI(parent)
                     end
                 end
             end
+            print("Rotation reset")
+        else
+            warn("No part selected")
         end
     end)
-    yPos = newYPos
+    yPos = yPos2
     
-    local clearBtn, newYPos = createButton("Clear All Forces", yPos, Color3.fromRGB(60, 60, 60), function()
+    -- Clear All Forces Button (Built-in)
+    local clearBtn, yPos2 = createButton("Clear All Forces", yPos, Color3.fromRGB(60, 60, 60), function()
         for _, part in ipairs(game.Workspace:GetDescendants()) do
             if part:IsA("BasePart") then
                 for _, child in ipairs(part:GetChildren()) do
-                    if child.Name == "MoveToolPosition" or child.Name == "MoveToolGyro" or child.Name == "RingPosition" or child.Name == "RingGyro" then
+                    if child.Name == "MoveToolPosition" or child.Name == "MoveToolGyro" or 
+                       child.Name == "RingPosition" or child.Name == "RingGyro" or 
+                       child.Name == "SpinVelocity" then
                         child:Destroy()
                     end
                 end
             end
         end
-        deselectPart()
-        clearRingFormation()
+        
+        -- Disable all tools
+        if LoadedTools.MoveTool then LoadedTools.MoveTool.Disable() end
+        if LoadedTools.RotateTool then LoadedTools.RotateTool.Disable() end
+        if LoadedTools.RingShape then LoadedTools.RingShape.Disable() end
+        if LoadedTools.RPMTool then LoadedTools.RPMTool.Disable() end
+        
+        -- Reset button colors
+        moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        rotateToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        if ringBtn then ringBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100) end
+        if spinBtn then spinBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100) end
+        
+        print("All forces cleared")
     end)
-    yPos = newYPos
-    
-    yPos = yPos + 20
+    yPos = yPos2 + 20
     
     -- RING FORMATION Section
     local ringTitle = Instance.new("TextLabel")
@@ -727,40 +271,83 @@ function MiscModule.CreateUI(parent)
     yPos = yPos + 40
     
     ringBtn, yPos = createButton("Ring Shape", yPos, Color3.fromRGB(100, 100, 100), function()
-        ringEnabled = not ringEnabled
+        local ringShape = loadTool("RingShape", ToolURLs.RingShape)
+        if not ringShape then return end
         
-        if ringEnabled then
-            ringBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-            applyRingFormation()
-            startRingUpdate()
-        else
+        if ringShape.IsEnabled() then
+            ringShape.Disable()
             ringBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-            clearRingFormation()
+        else
+            ringShape.Enable()
+            ringBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
         end
     end)
     
-    yPos = createSlider("Ring Radius", yPos, 5, 50, ringRadius, function(value)
-        ringRadius = value
-        updateArrowBillboards()
+    yPos = createSlider("Ring Radius", yPos, 5, 50, 10, function(value)
+        local ringShape = LoadedTools.RingShape
+        if ringShape then
+            ringShape.SetRadius(value)
+        end
     end)
     
-    yPos = createSlider("Ring Height", yPos, -10, 20, ringHeight, function(value)
-        ringHeight = value
+    yPos = createSlider("Ring Height", yPos, -10, 20, 3, function(value)
+        local ringShape = LoadedTools.RingShape
+        if ringShape then
+            ringShape.SetHeight(value)
+        end
     end)
     
     yPos = createSlider("Ring Rotation", yPos, 0, 360, 0, function(value)
-        ringRotation = math.rad(value)
-        updateArrowBillboards()
+        local ringShape = LoadedTools.RingShape
+        if ringShape then
+            ringShape.SetRotation(value)
+        end
+    end)
+    
+    yPos = yPos + 20
+    
+    -- SPIN PARTS Section
+    local spinTitle = Instance.new("TextLabel")
+    spinTitle.Size = UDim2.new(1, -20, 0, 30)
+    spinTitle.Position = UDim2.new(0, 10, 0, yPos)
+    spinTitle.BackgroundTransparency = 1
+    spinTitle.Text = "SPIN PARTS"
+    spinTitle.Font = Enum.Font.GothamBlack
+    spinTitle.TextSize = 16
+    spinTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    spinTitle.TextXAlignment = Enum.TextXAlignment.Left
+    spinTitle.Parent = miscContent
+    yPos = yPos + 40
+    
+    spinBtn, yPos = createButton("Spin Parts", yPos, Color3.fromRGB(100, 100, 100), function()
+        local rpmTool = loadTool("RPMTool", ToolURLs.RPMTool)
+        if not rpmTool then return end
+        
+        if rpmTool.IsEnabled() then
+            rpmTool.Disable()
+            spinBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        else
+            rpmTool.Enable()
+            spinBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 200)
+        end
+    end)
+    
+    yPos = createSlider("Spin RPM", yPos, 1, 100, 10, function(value)
+        local rpmTool = LoadedTools.RPMTool
+        if rpmTool then
+            rpmTool.SetRPM(value)
+        end
     end)
     
     miscContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 20)
 end
 
 function MiscModule.Cleanup()
-    if mouseConnection then mouseConnection:Disconnect() end
-    if keyConnection then keyConnection:Disconnect() end
-    deselectPart()
-    clearRingFormation()
+    -- Cleanup all loaded tools
+    if LoadedTools.MoveTool then LoadedTools.MoveTool.Disable() end
+    if LoadedTools.RotateTool then LoadedTools.RotateTool.Disable() end
+    if LoadedTools.RingShape then LoadedTools.RingShape.Disable() end
+    if LoadedTools.RPMTool then LoadedTools.RPMTool.Disable() end
 end
 
 return MiscModule
