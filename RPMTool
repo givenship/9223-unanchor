@@ -1,5 +1,5 @@
 -- RPM Tool Module
--- Spins parts at adjustable RPM
+-- Spins parts at adjustable RPM with axis selection
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,6 +9,7 @@ local RPMToolModule = {}
 -- Variables
 local spinEnabled = false
 local spinRPM = 10
+local spinAxis = "Vertical" -- "Vertical" or "Horizontal"
 local spinParts = {}
 local spinUpdateConnection = nil
 
@@ -84,7 +85,13 @@ local function updateSpinVelocity()
     
     for _, data in ipairs(spinParts) do
         if data.part and data.part.Parent and data.bav and data.bav.Parent then
-            data.bav.AngularVelocity = Vector3.new(0, radiansPerSecond, 0)
+            if spinAxis == "Vertical" then
+                -- Spin on Y axis (vertical)
+                data.bav.AngularVelocity = Vector3.new(0, radiansPerSecond, 0)
+            else
+                -- Spin on X axis (horizontal)
+                data.bav.AngularVelocity = Vector3.new(radiansPerSecond, 0, 0)
+            end
         end
     end
 end
@@ -139,6 +146,14 @@ end
 
 function RPMToolModule.GetRPM()
     return spinRPM
+end
+
+function RPMToolModule.SetAxis(axis)
+    spinAxis = axis
+end
+
+function RPMToolModule.GetAxis()
+    return spinAxis
 end
 
 return RPMToolModule
