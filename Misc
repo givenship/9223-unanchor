@@ -64,7 +64,9 @@ function MiscModule.CreateUI(parent)
         button.TextColor3 = Color3.fromRGB(255, 255, 255)
         button.Parent = miscContent
         
-        button.MouseButton1Click:Connect(callback)
+        button.MouseButton1Click:Connect(function()
+            callback(button)
+        end)
         return button, position + 45
     end
     
@@ -159,44 +161,45 @@ function MiscModule.CreateUI(parent)
     local rotateToolBtn
     local ringBtn
     local spinBtn
+    local safeNosBtn
     
     -- Move Tool Button
-    moveToolBtn, yPos = createButton("Move Tool", yPos, Color3.fromRGB(100, 100, 100), function()
+    moveToolBtn, yPos = createButton("Move Tool", yPos, Color3.fromRGB(100, 100, 100), function(button)
         local moveTool = loadTool("MoveTool", ToolURLs.MoveTool)
         if not moveTool then return end
         
         if moveTool.IsEnabled() then
             moveTool.Disable()
-            moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         else
             -- Disable other tools
             if LoadedTools.RotateTool and LoadedTools.RotateTool.IsEnabled() then
                 LoadedTools.RotateTool.Disable()
-                rotateToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+                if rotateToolBtn then rotateToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100) end
             end
             
             moveTool.Enable()
-            moveToolBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 220)
+            button.BackgroundColor3 = Color3.fromRGB(50, 180, 220)
         end
     end)
     
     -- Rotate Tool Button
-    rotateToolBtn, yPos = createButton("Rotate Tool", yPos, Color3.fromRGB(100, 100, 100), function()
+    rotateToolBtn, yPos = createButton("Rotate Tool", yPos, Color3.fromRGB(100, 100, 100), function(button)
         local rotateTool = loadTool("RotateTool", ToolURLs.RotateTool)
         if not rotateTool then return end
         
         if rotateTool.IsEnabled() then
             rotateTool.Disable()
-            rotateToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         else
             -- Disable other tools
             if LoadedTools.MoveTool and LoadedTools.MoveTool.IsEnabled() then
                 LoadedTools.MoveTool.Disable()
-                moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+                if moveToolBtn then moveToolBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100) end
             end
             
             rotateTool.Enable()
-            rotateToolBtn.BackgroundColor3 = Color3.fromRGB(220, 100, 50)
+            button.BackgroundColor3 = Color3.fromRGB(220, 100, 50)
         end
     end)
     
@@ -270,16 +273,16 @@ function MiscModule.CreateUI(parent)
     ringTitle.Parent = miscContent
     yPos = yPos + 40
     
-    ringBtn, yPos = createButton("Ring Shape", yPos, Color3.fromRGB(100, 100, 100), function()
+    ringBtn, yPos = createButton("Ring Shape", yPos, Color3.fromRGB(100, 100, 100), function(button)
         local ringShape = loadTool("RingShape", ToolURLs.RingShape)
         if not ringShape then return end
         
         if ringShape.IsEnabled() then
             ringShape.Disable()
-            ringBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         else
             ringShape.Enable()
-            ringBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+            button.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
         end
     end)
     
@@ -319,16 +322,16 @@ function MiscModule.CreateUI(parent)
     spinTitle.Parent = miscContent
     yPos = yPos + 40
     
-    spinBtn, yPos = createButton("Spin Parts", yPos, Color3.fromRGB(100, 100, 100), function()
+    spinBtn, yPos = createButton("Spin Parts", yPos, Color3.fromRGB(100, 100, 100), function(button)
         local rpmTool = loadTool("RPMTool", ToolURLs.RPMTool)
         if not rpmTool then return end
         
         if rpmTool.IsEnabled() then
             rpmTool.Disable()
-            spinBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         else
             rpmTool.Enable()
-            spinBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 200)
+            button.BackgroundColor3 = Color3.fromRGB(255, 100, 200)
         end
     end)
     
@@ -409,11 +412,11 @@ function MiscModule.CreateUI(parent)
     safeNosTitle.Parent = miscContent
     yPos = yPos + 40
     
-    local safeNosBtn, newYPos = createButton("Safe-NOS", yPos, Color3.fromRGB(100, 100, 100), function()
+    safeNosBtn, yPos = createButton("Safe-NOS", yPos, Color3.fromRGB(100, 100, 100), function(button)
         if getgenv().SafeNOSEnabled then
             getgenv().SafeNOSEnabled = false
-            safeNosBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-            safeNosBtn.Text = "Safe-NOS"
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            button.Text = "Safe-NOS"
             
             if getgenv().SafeNOSConnection then
                 getgenv().SafeNOSConnection:Disconnect()
@@ -421,8 +424,8 @@ function MiscModule.CreateUI(parent)
             end
         else
             getgenv().SafeNOSEnabled = true
-            safeNosBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
-            safeNosBtn.Text = "Safe-NOS (ON)"
+            button.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
+            button.Text = "Safe-NOS (ON)"
             
             -- Start monitoring network ownership
             local Players = game:GetService("Players")
@@ -463,7 +466,6 @@ function MiscModule.CreateUI(parent)
             end)
         end
     end)
-    yPos = newYPos
     
     local safeNosInfo = Instance.new("TextLabel")
     safeNosInfo.Size = UDim2.new(1, -20, 0, 40)
