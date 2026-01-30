@@ -1,1 +1,144 @@
+-- RPM Tool Module
+-- Spins parts at adjustable RPM
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local RPMToolModule = {}
+
+-- Variables
+local spinEnabled = false
+local spinRPM = 10
+local spinParts = {}
+local spinUpdateConnection = nil
+
+-- Helper Functions
+local function isBodyPart(part)
+    local bodyPartNames = {"Torso", "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg", "HumanoidRootPart"}
+    for _, name in ipairs(bodyPartNames) do
+        if part.Name == name then
+            return true
+        end
+    end
+    return false
+end
+
+local function collectUnanchoredParts()
+    local parts = {}
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if (part:IsA("BasePart") or part:IsA("UnionOperation")) and not part.Anchored and not isBodyPart(part) then
+            local isPlayerPart = false
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character and part:IsDescendantOf(plr.Character) then
+                    isPlayerPart = true
+                    break
+                end
+            end
+            if not isPlayerPart then
+                table.insert(parts, part)
+            end
+        end
+    end
+    return parts
+end
+
+local function applySpinToAllParts()
+    local unanchoredParts = collectUnanchoredParts()
+    if #unanchoredParts == 0 then
+        return
+    end
+    
+    spinParts = {}
+    
+    for _, part in ipairs(unanchoredParts) do
+        -- Remove existing BodyAngularVelocity
+        for _, child in ipairs(part:GetChildren()) do
+            if child:IsA("BodyAngularVelocity") and child.Name == "SpinVelocity" then
+                child:Destroy()
+            end
+        end
+        
+        -- Create BodyAngularVelocity for spinning
+        local bav = Instance.new("BodyAngularVelocity")
+        bav.Name = "SpinVelocity"
+        bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bav.AngularVelocity = Vector3.new(0, 0, 0)
+        bav.P = 10000
+        bav.Parent = part
+        
+        table.insert(spinParts, {
+            part = part,
+            bav = bav
+        })
+    end
+end
+
+local function updateSpinVelocity()
+    if not spinEnabled then return end
+    
+    -- Convert RPM to radians per second
+    -- RPM = revolutions per minute
+    -- 1 revolution = 2π radians
+    -- radians per second = (RPM * 2π) / 60
+    local radiansPerSecond = (spinRPM * 2 * math.pi) / 60
+    
+    for _, data in ipairs(spinParts) do
+        if data.part and data.part.Parent and data.bav and data.bav.Parent then
+            data.bav.AngularVelocity = Vector3.new(0, radiansPerSecond, 0)
+        end
+    end
+end
+
+local function startSpinUpdate()
+    if spinUpdateConnection then return end
+    
+    spinUpdateConnection = RunService.Heartbeat:Connect(function()
+        if spinEnabled then
+            updateSpinVelocity()
+        end
+    end)
+end
+
+local function stopSpinUpdate()
+    if spinUpdateConnection then
+        spinUpdateConnection:Disconnect()
+        spinUpdateConnection = nil
+    end
+end
+
+local function clearSpinFromAllParts()
+    for _, data in ipairs(spinParts) do
+        if data.part and data.part.Parent then
+            if data.bav then data.bav:Destroy() end
+        end
+    end
+    spinParts = {}
+    stopSpinUpdate()
+end
+
+-- Public Functions
+function RPMToolModule.Enable()
+    if spinEnabled then return end
+    spinEnabled = true
+    applySpinToAllParts()
+    startSpinUpdate()
+end
+
+function RPMToolModule.Disable()
+    spinEnabled = false
+    clearSpinFromAllParts()
+end
+
+function RPMToolModule.IsEnabled()
+    return spinEnabled
+end
+
+function RPMToolModule.SetRPM(value)
+    spinRPM = value
+end
+
+function RPMToolModule.GetRPM()
+    return spinRPM
+end
+
+return RPMToolModule
