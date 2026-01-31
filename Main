@@ -221,7 +221,7 @@ end)
 
 -- Tab creation function
 local currentTab = nil
-local function createTab(tabName, tabContent)
+local function createTab(tabName)
     -- Tab button
     local tabButton = Instance.new("TextButton")
     tabButton.Name = tabName .. "Tab"
@@ -260,7 +260,7 @@ local function createTab(tabName, tabContent)
     tabButton.MouseButton1Click:Connect(function()
         -- Hide all tabs
         for _, child in pairs(contentScroll:GetChildren()) do
-            if child:IsA("Frame") then
+            if child:IsA("Frame") and child.Name:match("Content$") then
                 child.Visible = false
             end
         end
@@ -368,12 +368,12 @@ local function createSection(parent, sectionTitle)
 end
 
 -- Create tabs
-local homeTab = createTab("Home", {})
-local visualTab = createTab("Visual", {})
-local combatTab = createTab("Combat", {})
-local playerTab = createTab("Player", {})
-local miscTab = createTab("Misc", {})
-local settingsTab = createTab("Settings", {})
+local homeTab = createTab("Home")
+local visualTab = createTab("Visual")
+local combatTab = createTab("Combat")
+local playerTab = createTab("Player")
+local miscTab = createTab("Misc")
+local settingsTab = createTab("Settings")
 
 -- Populate Home tab
 local homeSection = createSection(homeTab, "Welcome to Euva")
@@ -381,5 +381,301 @@ createLabel(homeSection, "Main system loaded successfully")
 createButton(homeSection, "Test Button", function()
     print("Button clicked!")
 end)
+
+-- ============================================
+-- SETTINGS TAB - Transparency Controls
+-- ============================================
+
+-- GUI Transparency Settings
+local guiTransSection = createSection(settingsTab, "GUI Transparency")
+
+local guiTransLabel = createLabel(guiTransSection, "GUI Transparency: 0%")
+
+local guiTransSlider = Instance.new("Frame")
+guiTransSlider.Size = UDim2.new(1, -20, 0, 30)
+guiTransSlider.BackgroundColor3 = Color3.fromRGB(235, 215, 225)
+guiTransSlider.BorderSizePixel = 0
+guiTransSlider.ZIndex = 4
+guiTransSlider.Parent = guiTransSection
+
+local guiTransCorner = Instance.new("UICorner")
+guiTransCorner.CornerRadius = UDim.new(0, 6)
+guiTransCorner.Parent = guiTransSlider
+
+local guiTransFill = Instance.new("Frame")
+guiTransFill.Size = UDim2.new(0, 0, 1, 0)
+guiTransFill.BackgroundColor3 = Color3.fromRGB(220, 190, 210)
+guiTransFill.BorderSizePixel = 0
+guiTransFill.ZIndex = 5
+guiTransFill.Parent = guiTransSlider
+
+local guiTransFillCorner = Instance.new("UICorner")
+guiTransFillCorner.CornerRadius = UDim.new(0, 6)
+guiTransFillCorner.Parent = guiTransFill
+
+local guiTransDrag = Instance.new("TextButton")
+guiTransDrag.Size = UDim2.new(0, 20, 0, 20)
+guiTransDrag.Position = UDim2.new(0, -10, 0.5, -10)
+guiTransDrag.BackgroundColor3 = Color3.fromRGB(210, 180, 200)
+guiTransDrag.BorderSizePixel = 0
+guiTransDrag.Text = ""
+guiTransDrag.ZIndex = 6
+guiTransDrag.Parent = guiTransFill
+
+local guiTransDragCorner = Instance.new("UICorner")
+guiTransDragCorner.CornerRadius = UDim.new(1, 0)
+guiTransDragCorner.Parent = guiTransDrag
+
+local guiTransValue = 0
+local function updateGUITransparency(value)
+    guiTransValue = math.clamp(value, 0, 1)
+    guiTransFill.Size = UDim2.new(guiTransValue, 0, 1, 0)
+    guiTransLabel.Text = "GUI Transparency: " .. math.floor(guiTransValue * 100) .. "%"
+    mainFrame.BackgroundTransparency = guiTransValue * 0.7
+end
+
+guiTransDrag.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local dragging = true
+        local function update()
+            while dragging do
+                local mousePos = UserInputService:GetMouseLocation().X
+                local sliderPos = guiTransSlider.AbsolutePosition.X
+                local sliderSize = guiTransSlider.AbsoluteSize.X
+                local relative = (mousePos - sliderPos) / sliderSize
+                updateGUITransparency(relative)
+                task.wait()
+            end
+        end
+        task.spawn(update)
+        
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                connection:Disconnect()
+            end
+        end)
+    end
+end)
+
+-- Decoration Transparency Settings
+local decoTransSection = createSection(settingsTab, "Decoration Transparency")
+
+local decoTransLabel = createLabel(decoTransSection, "Decoration Transparency: 80%")
+
+local decoTransSlider = Instance.new("Frame")
+decoTransSlider.Size = UDim2.new(1, -20, 0, 30)
+decoTransSlider.BackgroundColor3 = Color3.fromRGB(235, 215, 225)
+decoTransSlider.BorderSizePixel = 0
+decoTransSlider.ZIndex = 4
+decoTransSlider.Parent = decoTransSection
+
+local decoTransCorner = Instance.new("UICorner")
+decoTransCorner.CornerRadius = UDim.new(0, 6)
+decoTransCorner.Parent = decoTransSlider
+
+local decoTransFill = Instance.new("Frame")
+decoTransFill.Size = UDim2.new(0.8, 0, 1, 0)
+decoTransFill.BackgroundColor3 = Color3.fromRGB(220, 190, 210)
+decoTransFill.BorderSizePixel = 0
+decoTransFill.ZIndex = 5
+decoTransFill.Parent = decoTransSlider
+
+local decoTransFillCorner = Instance.new("UICorner")
+decoTransFillCorner.CornerRadius = UDim.new(0, 6)
+decoTransFillCorner.Parent = decoTransFill
+
+local decoTransDrag = Instance.new("TextButton")
+decoTransDrag.Size = UDim2.new(0, 20, 0, 20)
+decoTransDrag.Position = UDim2.new(0, -10, 0.5, -10)
+decoTransDrag.BackgroundColor3 = Color3.fromRGB(210, 180, 200)
+decoTransDrag.BorderSizePixel = 0
+decoTransDrag.Text = ""
+decoTransDrag.ZIndex = 6
+decoTransDrag.Parent = decoTransFill
+
+local decoTransDragCorner = Instance.new("UICorner")
+decoTransDragCorner.CornerRadius = UDim.new(1, 0)
+decoTransDragCorner.Parent = decoTransDrag
+
+local decoTransValue = 0.8
+local decorationElements = {}
+
+local function updateDecoTransparency(value)
+    decoTransValue = math.clamp(value, 0, 1)
+    decoTransFill.Size = UDim2.new(decoTransValue, 0, 1, 0)
+    decoTransLabel.Text = "Decoration Transparency: " .. math.floor(decoTransValue * 100) .. "%"
+    
+    for _, element in pairs(decorationElements) do
+        if element and element.Parent then
+            element.ImageTransparency = decoTransValue
+        end
+    end
+end
+
+decoTransDrag.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local dragging = true
+        local function update()
+            while dragging do
+                local mousePos = UserInputService:GetMouseLocation().X
+                local sliderPos = decoTransSlider.AbsolutePosition.X
+                local sliderSize = decoTransSlider.AbsoluteSize.X
+                local relative = (mousePos - sliderPos) / sliderSize
+                updateDecoTransparency(relative)
+                task.wait()
+            end
+        end
+        task.spawn(update)
+        
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                connection:Disconnect()
+            end
+        end)
+    end
+end)
+
+-- ============================================
+-- DECORATIVE ELEMENTS
+-- ============================================
+
+-- TreeL - Content Area Left Bottom
+local treeLBottom = Instance.new("ImageLabel")
+treeLBottom.Name = "TreeLBottom"
+treeLBottom.Size = UDim2.new(0, 40, 0, 40)
+treeLBottom.Position = UDim2.new(0, 10, 1, -50)
+treeLBottom.BackgroundTransparency = 1
+treeLBottom.Image = "rbxassetid://97762968859118"
+treeLBottom.ImageTransparency = decoTransValue
+treeLBottom.ZIndex = 10
+treeLBottom.Parent = contentArea
+table.insert(decorationElements, treeLBottom)
+
+-- TreeR Inverted - Top Right
+local treeRTop = Instance.new("ImageLabel")
+treeRTop.Name = "TreeRTop"
+treeRTop.Size = UDim2.new(0, 40, 0, 40)
+treeRTop.Position = UDim2.new(1, -50, 0, 10)
+treeRTop.BackgroundTransparency = 1
+treeRTop.Image = "rbxassetid://137672331508230"
+treeRTop.ImageTransparency = decoTransValue
+treeRTop.Rotation = 180
+treeRTop.ZIndex = 10
+treeRTop.Parent = contentArea
+table.insert(decorationElements, treeRTop)
+
+-- LArrow - Entire GUI Left Top
+local lArrow = Instance.new("ImageLabel")
+lArrow.Name = "LArrow"
+lArrow.Size = UDim2.new(0, 30, 0, 30)
+lArrow.Position = UDim2.new(0, 10, 0, 10)
+lArrow.BackgroundTransparency = 1
+lArrow.Image = "rbxassetid://85796063517484"
+lArrow.ImageTransparency = decoTransValue
+lArrow.ZIndex = 10
+lArrow.Parent = mainFrame
+table.insert(decorationElements, lArrow)
+
+-- RArrow - Entire GUI Right Bottom
+local rArrow = Instance.new("ImageLabel")
+rArrow.Name = "RArrow"
+rArrow.Size = UDim2.new(0, 30, 0, 30)
+rArrow.Position = UDim2.new(1, -40, 1, -40)
+rArrow.BackgroundTransparency = 1
+rArrow.Image = "rbxassetid://90725829162539"
+rArrow.ImageTransparency = decoTransValue
+rArrow.ZIndex = 10
+rArrow.Parent = mainFrame
+table.insert(decorationElements, rArrow)
+
+-- Eye - Center Middle
+local eye = Instance.new("ImageLabel")
+eye.Name = "Eye"
+eye.Size = UDim2.new(0, 50, 0, 50)
+eye.Position = UDim2.new(0.5, -25, 0.5, -25)
+eye.BackgroundTransparency = 1
+eye.Image = "rbxassetid://117113193301064"
+eye.ImageTransparency = decoTransValue
+eye.ZIndex = 10
+eye.Parent = mainFrame
+table.insert(decorationElements, eye)
+
+-- Left Wing
+local leftWing = Instance.new("ImageLabel")
+leftWing.Name = "LeftWing"
+leftWing.Size = UDim2.new(0, 40, 0, 40)
+leftWing.Position = UDim2.new(0.5, -70, 0.5, -20)
+leftWing.BackgroundTransparency = 1
+leftWing.Image = "rbxassetid://131942306305044"
+leftWing.ImageTransparency = decoTransValue
+leftWing.ZIndex = 10
+leftWing.Parent = mainFrame
+table.insert(decorationElements, leftWing)
+
+-- Right Wing (Inverted)
+local rightWing = Instance.new("ImageLabel")
+rightWing.Name = "RightWing"
+rightWing.Size = UDim2.new(0, 40, 0, 40)
+rightWing.Position = UDim2.new(0.5, 30, 0.5, -20)
+rightWing.BackgroundTransparency = 1
+rightWing.Image = "rbxassetid://131942306305044"
+rightWing.ImageTransparency = decoTransValue
+rightWing.ScaleType = Enum.ScaleType.Fit
+rightWing.Rotation = 180
+rightWing.ZIndex = 10
+rightWing.Parent = mainFrame
+table.insert(decorationElements, rightWing)
+
+-- ============================================
+-- 4 THIN LINE GRID
+-- ============================================
+
+-- Vertical Line 1 (Left)
+local vLine1 = Instance.new("Frame")
+vLine1.Name = "GridVLine1"
+vLine1.Size = UDim2.new(0, 1, 1, 0)
+vLine1.Position = UDim2.new(0.25, 0, 0, 0)
+vLine1.BackgroundColor3 = Color3.fromRGB(230, 210, 220)
+vLine1.BackgroundTransparency = 0.7
+vLine1.BorderSizePixel = 0
+vLine1.ZIndex = 1
+vLine1.Parent = mainFrame
+
+-- Vertical Line 2 (Right)
+local vLine2 = Instance.new("Frame")
+vLine2.Name = "GridVLine2"
+vLine2.Size = UDim2.new(0, 1, 1, 0)
+vLine2.Position = UDim2.new(0.75, 0, 0, 0)
+vLine2.BackgroundColor3 = Color3.fromRGB(230, 210, 220)
+vLine2.BackgroundTransparency = 0.7
+vLine2.BorderSizePixel = 0
+vLine2.ZIndex = 1
+vLine2.Parent = mainFrame
+
+-- Horizontal Line 1 (Top)
+local hLine1 = Instance.new("Frame")
+hLine1.Name = "GridHLine1"
+hLine1.Size = UDim2.new(1, 0, 0, 1)
+hLine1.Position = UDim2.new(0, 0, 0.25, 0)
+hLine1.BackgroundColor3 = Color3.fromRGB(230, 210, 220)
+hLine1.BackgroundTransparency = 0.7
+hLine1.BorderSizePixel = 0
+hLine1.ZIndex = 1
+hLine1.Parent = mainFrame
+
+-- Horizontal Line 2 (Bottom)
+local hLine2 = Instance.new("Frame")
+hLine2.Name = "GridHLine2"
+hLine2.Size = UDim2.new(1, 0, 0, 1)
+hLine2.Position = UDim2.new(0, 0, 0.75, 0)
+hLine2.BackgroundColor3 = Color3.fromRGB(230, 210, 220)
+hLine2.BackgroundTransparency = 0.7
+hLine2.BorderSizePixel = 0
+hLine2.ZIndex = 1
+hLine2.Parent = mainFrame
 
 print("✅ Euva Main GUI loaded")
