@@ -2,8 +2,6 @@
 -- Complete fresh start with unified design
 -- Color: #F8E8ED with gradient from bottom-left to top-right
 
-print("sybau")
-
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
@@ -258,9 +256,9 @@ local function createTab(tabName)
     tabFrameLayout.Padding = UDim.new(0, 12)
     tabFrameLayout.Parent = tabFrame
     
-    -- Tab button click
-    tabButton.MouseButton1Click:Connect(function()
-        -- Hide all tabs
+    -- Tab button click (put the logic in a function)
+    local function selectThisTab()
+        -- Hide all tab content frames
         for _, child in pairs(contentScroll:GetChildren()) do
             if child:IsA("Frame") and child.Name:match("Content$") then
                 child.Visible = false
@@ -281,11 +279,13 @@ local function createTab(tabName)
         tabButton.TextColor3 = Color3.fromRGB(60, 50, 55)
         contentTitle.Text = tabName
         currentTab = tabFrame
-    end)
+    end
     
-    -- Auto-select first tab
+    tabButton.MouseButton1Click:Connect(selectThisTab)
+    
+    -- Auto-select first tab (CALL THE FUNCTION, not the event)
     if not currentTab then
-        tabButton.MouseButton1Click()
+        selectThisTab()
     end
     
     return tabFrame
@@ -442,22 +442,6 @@ guiTransDrag.MouseButton1Down:Connect(function()
     guiTransDragging = true
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        guiTransDragging = false
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if guiTransDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = UserInputService:GetMouseLocation().X
-        local sliderPos = guiTransSlider.AbsolutePosition.X
-        local sliderSize = guiTransSlider.AbsoluteSize.X
-        local relative = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
-        updateGUITransparency(relative)
-    end
-end)
-
 -- Decoration Transparency Settings
 local decoTransSection = createSection(settingsTab, "Decoration Transparency")
 
@@ -518,19 +502,31 @@ decoTransDrag.MouseButton1Down:Connect(function()
     decoTransDragging = true
 end)
 
+-- Single UserInputService connection for both sliders
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        guiTransDragging = false
         decoTransDragging = false
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if decoTransDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = UserInputService:GetMouseLocation().X
-        local sliderPos = decoTransSlider.AbsolutePosition.X
-        local sliderSize = decoTransSlider.AbsoluteSize.X
-        local relative = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
-        updateDecoTransparency(relative)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        if guiTransDragging then
+            local mousePos = UserInputService:GetMouseLocation().X
+            local sliderPos = guiTransSlider.AbsolutePosition.X
+            local sliderSize = guiTransSlider.AbsoluteSize.X
+            local relative = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+            updateGUITransparency(relative)
+        end
+        
+        if decoTransDragging then
+            local mousePos = UserInputService:GetMouseLocation().X
+            local sliderPos = decoTransSlider.AbsolutePosition.X
+            local sliderSize = decoTransSlider.AbsoluteSize.X
+            local relative = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+            updateDecoTransparency(relative)
+        end
     end
 end)
 
