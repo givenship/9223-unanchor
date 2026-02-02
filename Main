@@ -1,6 +1,8 @@
 -- Euva Main Entry Point
 -- Loads UI modules from GitHub and initializes GUI
 
+print("yall")
+
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 
