@@ -1,10 +1,11 @@
--- Euva Theme Module
--- Color palette and asset configuration
+-- Euva Theme Module (Compressed)
+-- Color palette, assets, config, and style presets
 
 local Theme = {}
 
 Theme.Colors = {
     Base = Color3.fromRGB(248, 232, 237),
+    Card = Color3.fromRGB(255, 255, 255),
     Text = Color3.fromRGB(60, 50, 55),
     TextMuted = Color3.fromRGB(100, 90, 95),
     Soft = Color3.fromRGB(240, 220, 230),
@@ -14,6 +15,8 @@ Theme.Colors = {
     SliderKnob = Color3.fromRGB(210, 180, 200),
     Line = Color3.fromRGB(255, 255, 255),
     Discord = Color3.fromRGB(88, 101, 242),
+    Danger = Color3.fromRGB(220, 80, 80),
+    Success = Color3.fromRGB(80, 180, 120),
 }
 
 Theme.Assets = {
@@ -36,5 +39,87 @@ Theme.Config = {
     DefaultGuiTransparency = 0.4,
     DefaultDecoTransparency = 0.8,
 }
+
+-- Style presets for common element types
+Theme.Presets = {
+    Line = {
+        BorderSizePixel = 0,
+        BackgroundTransparency = 0.35,
+    },
+    Panel = {
+        BorderSizePixel = 0,
+        BackgroundTransparency = 0.35,
+    },
+    Card = {
+        BorderSizePixel = 0,
+        BackgroundTransparency = 0,
+    },
+    Label = {
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+    },
+    LabelMuted = {
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+    },
+    LabelBold = {
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+    },
+    Title = {
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Font = Enum.Font.Code,
+        TextSize = 28,
+    },
+    Button = {
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+    },
+    ButtonPrimary = {
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+    },
+    Image = {
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+    },
+    Container = {
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+    },
+}
+
+-- Merge preset with custom props
+function Theme.Apply(preset, props)
+    local result = {}
+    local base = Theme.Presets[preset]
+    if base then
+        for k, v in pairs(base) do result[k] = v end
+    end
+    if props then
+        for k, v in pairs(props) do result[k] = v end
+    end
+    return result
+end
+
+-- Quick color getters
+function Theme.C(name)
+    return Theme.Colors[name] or Color3.fromRGB(255, 255, 255)
+end
+
+function Theme.A(name)
+    return Theme.Assets[name] or ""
+end
 
 return Theme
