@@ -1,234 +1,106 @@
--- Auto Defuse Script
--- Upload this to GitHub and use the raw link
+-- Auto Defuse Module (Fixed)
+-- Automatically defuses bombs when in range
+-- FIX: Improved bomb detection and circle visibility
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local CoreGui = game:GetService("CoreGui")
+
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Get settings from global
-if not getgenv then
-    warn("getgenv not available - executor not supported")
-    return false
+local AutoDefuseControl = {}
+local defuseConnection = nil
+local circleConnection = nil
+local detectionCircles = {}
+
+-- Initialize settings if not exists
+if not getgenv().AutoDefuseSettings then
+    getgenv().AutoDefuseSettings = {
+        Enabled = false,
+        Delay = 3000,
+        ShowCircle = true,
+        DetectionRadius = 30
+    }
 end
 
-local AutoDefuseSettings = getgenv().AutoDefuseSettings
-if not AutoDefuseSettings then
-    warn("AutoDefuseSettings not found - load Combat GUI first")
-    return false
+local function worldToScreen(position)
+    local screenPos, onScreen = Camera:WorldToViewportPoint(position)
+    return Vector2.new(screenPos.X, screenPos.Y), onScreen, screenPos.Z
 end
 
--- Target animation IDs
-local DEFUSE_ANIMATION_IDS = {
-    "99918936475651",
-    "115241304811827"
-}
-
-local detectionCircles = {} -- Store circles for each character
-local monitoredCharacters = {} -- Track all characters
-local nearbyCharacters = {} -- Only characters within 70 studs
-local checkedAnimations = {} -- Track animations we've already detected
-local lastRadius = 30 -- Cache last radius to detect changes
-
--- Check if character is in Monsters team
-local function isMonstersTeam(character)
-    local player = Players:GetPlayerFromCharacter(character)
-    if not player or not player.Team then return false end
-    return player.Team.Name == "Monsters"
+local function createCircle()
+    local circle = Drawing.new("Circle")
+    circle.Thickness = 2
+    circle.Color = Color3.fromRGB(255, 100, 100)
+    circle.Filled = false
+    circle.Transparency = 0.3
+    circle.Visible = false
+    return circle
 end
 
--- Check if animation ID matches defuse animations
-local function isDefuseAnimation(numericId)
-    if not numericId then return false end
+-- Find all bombs in workspace
+local function findBombs()
+    local bombs = {}
     
-    for _, targetId in pairs(DEFUSE_ANIMATION_IDS) do
-        if numericId == targetId then
-            return true
-        end
-    end
-    return false
-end
-
--- Get distance from local player
-local function getDistance(character)
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        return math.huge
-    end
+    -- Search common bomb locations
+    local searchLocations = {
+        Workspace:FindFirstChild("Bombs"),
+        Workspace:FindFirstChild("Map"),
+        Workspace:FindFirstChild("Objects"),
+        Workspace
+    }
     
-    local targetHRP = character:FindFirstChild("HumanoidRootPart")
-    if not targetHRP then return math.huge end
+    -- Common bomb names to search for
+    local bombNames = {"Bomb", "PlantedBomb", "C4", "Explosive", "TimeBomb", "BombPart"}
     
-    return (LocalPlayer.Character.HumanoidRootPart.Position - targetHRP.Position).Magnitude
-end
-
--- Update nearby characters list (every 3 seconds)
-local function updateNearbyCharacters()
-    local newNearby = {}
-    
-    for character, _ in pairs(monitoredCharacters) do
-        if character and character.Parent then
-            local distance = getDistance(character)
-            
-            -- Only track characters within 70 studs
-            if distance <= 70 then
-                newNearby[character] = true
-            else
-                -- Remove circle if character is too far
-                removeDetectionCircle(character)
-            end
-        end
-    end
-    
-    nearbyCharacters = newNearby
-end
-
--- Create simple circle using single part
-local function createDetectionCircle(character)
-    if detectionCircles[character] then return end
-    
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    local radius = AutoDefuseSettings.DetectionRadius or 30
-    
-    -- Create single circle part
-    local circle = Instance.new("Part")
-    circle.Name = "DetectionCircle"
-    circle.Shape = Enum.PartType.Cylinder
-    circle.Size = Vector3.new(0.2, radius * 2, radius * 2)
-    circle.Anchored = true
-    circle.CanCollide = false
-    circle.Material = Enum.Material.SmoothPlastic
-    circle.Transparency = 0
-    circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))
-    circle.Parent = Workspace
-    
-    detectionCircles[character] = circle
-end
-
--- Remove detection circle
-local function removeDetectionCircle(character)
-    if detectionCircles[character] then
-        detectionCircles[character]:Destroy()
-        detectionCircles[character] = nil
-    end
-end
-
--- Update circle colors and position (only for nearby characters)
-local function updateCircles()
-    local radius = AutoDefuseSettings.DetectionRadius or 30
-    
-    -- Only recreate circles if radius changed
-    if radius ~= lastRadius then
-        for character, _ in pairs(detectionCircles) do
-            removeDetectionCircle(character)
-        end
-        lastRadius = radius
-    end
-    
-    -- Manage circle visibility (only for nearby characters)
-    if AutoDefuseSettings.ShowCircle then
-        -- Only process nearby characters
-        for character, _ in pairs(nearbyCharacters) do
-            if character and character.Parent then
-                if isMonstersTeam(character) then
-                    if not detectionCircles[character] then
-                        createDetectionCircle(character)
+    for _, location in ipairs(searchLocations) do
+        if location then
+            for _, obj in pairs(location:GetDescendants()) do
+                -- Check by name
+                for _, bombName in ipairs(bombNames) do
+                    if obj.Name:lower():find(bombName:lower()) then
+                        if obj:IsA("BasePart") or obj:IsA("Model") then
+                            table.insert(bombs, obj)
+                            break
+                        end
                     end
-                else
-                    removeDetectionCircle(character)
                 end
-            end
-        end
-    else
-        -- Remove all circles if disabled
-        for character, _ in pairs(detectionCircles) do
-            removeDetectionCircle(character)
-        end
-        return
-    end
-    
-    -- Update existing circles (position and color only)
-    for character, circle in pairs(detectionCircles) do
-        if character and character.Parent and circle and circle.Parent then
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local distance = getDistance(character)
-                local color = distance <= radius and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
                 
-                -- Update color
-                circle.Color = color
+                -- Check for ClickDetector (bombs usually have this)
+                if obj:IsA("ClickDetector") then
+                    local parent = obj.Parent
+                    if parent and (parent:IsA("BasePart") or parent:IsA("Model")) then
+                        -- Check if it looks like a bomb
+                        local isLikelyBomb = false
+                        for _, bombName in ipairs(bombNames) do
+                            if parent.Name:lower():find(bombName:lower()) then
+                                isLikelyBomb = true
+                                break
+                            end
+                        end
+                        -- Also add if parent has certain attributes
+                        if parent:FindFirstChild("Fuse") or parent:FindFirstChild("Timer") or parent:FindFirstChild("Countdown") then
+                            isLikelyBomb = true
+                        end
+                        if isLikelyBomb then
+                            table.insert(bombs, parent)
+                        end
+                    end
+                end
                 
-                -- Update position
-                circle.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))
-                
-                -- Update size if radius changed
-                circle.Size = Vector3.new(0.2, radius * 2, radius * 2)
-            end
-        else
-            if circle then circle:Destroy() end
-            detectionCircles[character] = nil
-        end
-    end
-end
-
--- Check for playing animations (only for nearby characters)
-local function checkAnimations()
-    -- Only check nearby characters
-    for character, _ in pairs(nearbyCharacters) do
-        if character and character.Parent then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                local animator = humanoid:FindFirstChildOfClass("Animator")
-                if animator then
-                    local success, tracks = pcall(function()
-                        return animator:GetPlayingAnimationTracks()
-                    end)
-                    
-                    if success and tracks then
-                        for _, track in ipairs(tracks) do
-                            if track.IsPlaying and track.Animation then
-                                local animId = track.Animation.AnimationId
-                                local numericId = animId:match("%d+")
-                                
-                                if numericId and isDefuseAnimation(numericId) then
-                                    local checkKey = character.Name .. "_" .. numericId .. "_" .. math.floor(track.TimePosition * 10)
-                                    
-                                    if not checkedAnimations[checkKey] then
-                                        checkedAnimations[checkKey] = true
-                                        
-                                        print("Animation detected:", numericId, "from", character.Name)
-                                        
-                                        local radius = AutoDefuseSettings.DetectionRadius or 30
-                                        local distance = getDistance(character)
-                                        
-                                        if distance <= radius then
-                                            print("DEFUSE ANIMATION DETECTED!")
-                                            print("Character:", character.Name)
-                                            print("Distance:", math.floor(distance), "studs")
-                                            
-                                            local delayMs = AutoDefuseSettings.Delay or 3000
-                                            print("Waiting", delayMs, "ms...")
-                                            
-                                            task.spawn(function()
-                                                task.wait(delayMs / 1000)
-                                                
-                                                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                                                task.wait(0.05)
-                                                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                                                
-                                                print("Defused! (Clicked)")
-                                                
-                                                task.wait(2)
-                                                checkedAnimations[checkKey] = nil
-                                            end)
-                                        else
-                                            print("Too far away:", math.floor(distance), "studs (need ≤" .. radius .. ")")
-                                            task.wait(1)
-                                            checkedAnimations[checkKey] = nil
-                                        end
-                                    end
-                                end
+                -- Check for ProximityPrompt (some games use this)
+                if obj:IsA("ProximityPrompt") then
+                    local parent = obj.Parent
+                    if parent then
+                        for _, bombName in ipairs(bombNames) do
+                            if parent.Name:lower():find(bombName:lower()) or 
+                               obj.ActionText:lower():find("defuse") or
+                               obj.ObjectText:lower():find("bomb") then
+                                table.insert(bombs, parent)
+                                break
                             end
                         end
                     end
@@ -236,122 +108,198 @@ local function checkAnimations()
             end
         end
     end
-end
-
--- Hook a character
-local function hookCharacter(character)
-    if not AutoDefuseSettings.Enabled then return end
-    monitoredCharacters[character] = true
-    print("Monitoring character:", character.Name)
-end
-
--- Start monitoring
-local updateLoop = nil
-local animLoop = nil
-local distanceLoop = nil
-
-local function startMonitoring()
-    local characters = Workspace:FindFirstChild("Characters")
     
-    if not characters then
-        warn("Workspace.Characters not found! Looking in Workspace root instead...")
-        characters = Workspace
+    -- Remove duplicates
+    local unique = {}
+    local seen = {}
+    for _, bomb in ipairs(bombs) do
+        if not seen[bomb] then
+            seen[bomb] = true
+            table.insert(unique, bomb)
+        end
     end
     
-    for _, character in ipairs(characters:GetChildren()) do
-        if character:IsA("Model") then
-            task.spawn(function()
-                hookCharacter(character)
+    return unique
+end
+
+local function getBombPosition(bomb)
+    if bomb:IsA("BasePart") then
+        return bomb.Position
+    elseif bomb:IsA("Model") then
+        if bomb.PrimaryPart then
+            return bomb.PrimaryPart.Position
+        end
+        local part = bomb:FindFirstChildWhichIsA("BasePart")
+        if part then
+            return part.Position
+        end
+    end
+    return nil
+end
+
+local function getDistanceToBomb(bomb)
+    local character = LocalPlayer.Character
+    if not character then return math.huge end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return math.huge end
+    
+    local bombPos = getBombPosition(bomb)
+    if not bombPos then return math.huge end
+    
+    return (rootPart.Position - bombPos).Magnitude
+end
+
+local function tryDefuseBomb(bomb)
+    -- Try ClickDetector
+    local clickDetector = bomb:FindFirstChildWhichIsA("ClickDetector", true)
+    if clickDetector then
+        pcall(function()
+            fireclickdetector(clickDetector)
+        end)
+        return true
+    end
+    
+    -- Try ProximityPrompt
+    local proximityPrompt = bomb:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if proximityPrompt then
+        pcall(function()
+            fireproximityprompt(proximityPrompt)
+        end)
+        return true
+    end
+    
+    -- Try firing remote events
+    local remotes = {"DefuseBomb", "Defuse", "DisarmBomb", "Disarm"}
+    for _, remoteName in ipairs(remotes) do
+        local remote = game:GetService("ReplicatedStorage"):FindFirstChild(remoteName, true)
+        if remote and remote:IsA("RemoteEvent") then
+            pcall(function()
+                remote:FireServer(bomb)
             end)
+            return true
         end
     end
     
-    characters.ChildAdded:Connect(function(character)
-        if not AutoDefuseSettings.Enabled then return end
-        task.wait(0.1)
-        if character:IsA("Model") then
-            task.spawn(function()
-                hookCharacter(character)
-            end)
-        end
-    end)
-    
-    characters.ChildRemoved:Connect(function(character)
-        monitoredCharacters[character] = nil
-        nearbyCharacters[character] = nil
-        removeDetectionCircle(character)
-    end)
-    
-    -- Distance checks: Every 3 seconds
-    distanceLoop = task.spawn(function()
-        while AutoDefuseSettings.Enabled do
-            pcall(updateNearbyCharacters)
-            task.wait(3)
-        end
-    end)
-    
-    -- Circle updates: 30 FPS (0.033s)
-    updateLoop = task.spawn(function()
-        while AutoDefuseSettings.Enabled do
-            pcall(updateCircles)
-            task.wait(0.033)
-        end
-    end)
-    
-    -- Animation checks: 100 FPS (0.01s)
-    animLoop = task.spawn(function()
-        while AutoDefuseSettings.Enabled do
-            pcall(checkAnimations)
-            task.wait(0.01)
-        end
-    end)
-    
-    print("Auto Defuse enabled - Simple cylinder circles")
-    print("Target IDs:", table.concat(DEFUSE_ANIMATION_IDS, ", "))
-    print("Detection Radius:", AutoDefuseSettings.DetectionRadius or 30, "studs")
-    print("Max Range: 70 studs (checked every 3s)")
-    print("Delay:", AutoDefuseSettings.Delay or 3000, "ms")
-    print("Show Circle:", AutoDefuseSettings.ShowCircle and "Yes" or "No")
-    print("Filter: Monsters team only")
+    return false
 end
 
-local function stopMonitoring()
-    if updateLoop then
-        task.cancel(updateLoop)
-        updateLoop = nil
-    end
-    
-    if animLoop then
-        task.cancel(animLoop)
-        animLoop = nil
-    end
-    
-    if distanceLoop then
-        task.cancel(distanceLoop)
-        distanceLoop = nil
-    end
-    
-    for character, circle in pairs(detectionCircles) do
-        circle:Destroy()
+local function updateCircles()
+    -- Clear old circles
+    for _, circle in pairs(detectionCircles) do
+        pcall(function() circle:Remove() end)
     end
     detectionCircles = {}
-    monitoredCharacters = {}
-    nearbyCharacters = {}
-    checkedAnimations = {}
+    
+    if not getgenv().AutoDefuseSettings.ShowCircle then return end
+    if not getgenv().AutoDefuseSettings.Enabled then return end
+    
+    local bombs = findBombs()
+    local radius = getgenv().AutoDefuseSettings.DetectionRadius
+    
+    for _, bomb in ipairs(bombs) do
+        local bombPos = getBombPosition(bomb)
+        if bombPos then
+            local screenPos, onScreen, depth = worldToScreen(bombPos)
+            
+            if onScreen and depth > 0 then
+                local circle = createCircle()
+                
+                -- Calculate screen radius based on distance
+                local scaleFactor = 1000 / math.max(depth, 1)
+                local screenRadius = math.clamp(radius * scaleFactor, 20, 200)
+                
+                circle.Position = screenPos
+                circle.Radius = screenRadius
+                circle.Visible = true
+                
+                -- Change color based on distance
+                local distance = getDistanceToBomb(bomb)
+                if distance <= radius then
+                    circle.Color = Color3.fromRGB(0, 255, 0) -- Green when in range
+                else
+                    circle.Color = Color3.fromRGB(255, 100, 100) -- Red when out of range
+                end
+                
+                table.insert(detectionCircles, circle)
+            end
+        end
+    end
 end
 
--- Export control functions
-getgenv().AutoDefuseControl = {
-    Start = function()
-        AutoDefuseSettings.Enabled = true
-        startMonitoring()
-    end,
-    Stop = function()
-        AutoDefuseSettings.Enabled = false
-        stopMonitoring()
-        print("Auto Defuse disabled")
+local function defuseLoop()
+    local bombs = findBombs()
+    local radius = getgenv().AutoDefuseSettings.DetectionRadius
+    local delay = getgenv().AutoDefuseSettings.Delay / 1000 -- Convert to seconds
+    
+    for _, bomb in ipairs(bombs) do
+        local distance = getDistanceToBomb(bomb)
+        
+        if distance <= radius then
+            -- Wait for delay before defusing
+            if delay > 0 then
+                task.wait(delay)
+            end
+            
+            -- Check if still in range and enabled
+            if getgenv().AutoDefuseSettings.Enabled then
+                local newDistance = getDistanceToBomb(bomb)
+                if newDistance <= radius then
+                    local success = tryDefuseBomb(bomb)
+                    if success then
+                        print("[AutoDefuse] Defused bomb at distance:", math.floor(newDistance))
+                    end
+                end
+            end
+        end
     end
-}
+end
 
-print("Auto Defuse Script Loaded!")
-return true
+function AutoDefuseControl.Start()
+    getgenv().AutoDefuseSettings.Enabled = true
+    
+    -- Start defuse loop
+    if not defuseConnection then
+        defuseConnection = RunService.Heartbeat:Connect(function()
+            if getgenv().AutoDefuseSettings.Enabled then
+                pcall(defuseLoop)
+            end
+        end)
+    end
+    
+    -- Start circle update loop
+    if not circleConnection then
+        circleConnection = RunService.RenderStepped:Connect(function()
+            pcall(updateCircles)
+        end)
+    end
+    
+    print("[AutoDefuse] Started - Detection radius:", getgenv().AutoDefuseSettings.DetectionRadius)
+end
+
+function AutoDefuseControl.Stop()
+    getgenv().AutoDefuseSettings.Enabled = false
+    
+    if defuseConnection then
+        defuseConnection:Disconnect()
+        defuseConnection = nil
+    end
+    
+    if circleConnection then
+        circleConnection:Disconnect()
+        circleConnection = nil
+    end
+    
+    -- Clean up circles
+    for _, circle in pairs(detectionCircles) do
+        pcall(function() circle:Remove() end)
+    end
+    detectionCircles = {}
+    
+    print("[AutoDefuse] Stopped")
+end
+
+-- Export control
+getgenv().AutoDefuseControl = AutoDefuseControl
+
+return AutoDefuseControl
