@@ -2,6 +2,8 @@
 -- Automatically defuses bombs when in range
 -- FIX: Improved bomb detection and circle visibility
 
+print("v1")
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
