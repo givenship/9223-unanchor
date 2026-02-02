@@ -1,5 +1,5 @@
--- Visual Module (ESP) - 2D Box + Health Bar + Object ESP
--- This creates the UI for the Visual tab
+-- Visual Module (ESP) - Fixed Gold Block and Grave ESP
+-- 2D Box + Health Bar + Object ESP
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -25,10 +25,8 @@ local ObjectESP = {
     GoldBlocks = {},
     Graves = {}
 }
-local lastUpdateTime = 0
-local lastObjectUpdateTime = 0
 local espUpdateConnection = nil
-local checkboxStates = {}
+local objectUpdateConnection = nil
 local espToggleButton = nil
 
 -- Type decal IDs
@@ -84,15 +82,182 @@ local function createDrawing(type)
     return drawing
 end
 
+-- FIX: Improved object finder that searches multiple locations
+local function findObjectsInWorkspace(objectName, className)
+    local found = {}
+    
+    -- Search common locations
+    local searchLocations = {
+        Workspace:FindFirstChild("Blocks"),
+        Workspace:FindFirstChild("Map"),
+        Workspace:FindFirstChild("Objects"),
+        Workspace:FindFirstChild("Graves"),
+        Workspace:FindFirstChild("GoldBlocks"),
+        Workspace
+    }
+    
+    for _, location in ipairs(searchLocations) do
+        if location then
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj.Name == objectName then
+                    if className then
+                        if obj:IsA(className) then
+                            found[obj] = true
+                        end
+                    else
+                        found[obj] = true
+                    end
+                end
+            end
+        end
+    end
+    
+    return found
+end
+
+local function createObjectBillboard(object, decalId, espType)
+    -- Find the part to adorn
+    local adornee = object
+    if object:IsA("Model") then
+        adornee = object:FindFirstChild("HumanoidRootPart") or object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart")
+    end
+    
+    if not adornee then return nil end
+    
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ObjectESP_" .. espType
+    billboard.Size = UDim2.new(0, 80, 0, 80)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = adornee
+    billboard.Parent = CoreGui
+    
+    local imageLabel = Instance.new("ImageLabel")
+    imageLabel.Size = UDim2.new(1, 0, 1, 0)
+    imageLabel.BackgroundTransparency = 1
+    imageLabel.Image = decalId
+    imageLabel.ScaleType = Enum.ScaleType.Fit
+    imageLabel.Parent = billboard
+    
+    -- Add text label below
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 0, 20)
+    textLabel.Position = UDim2.new(0, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = espType
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 12
+    textLabel.TextColor3 = espType == "GoldBlock" and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(128, 128, 128)
+    textLabel.TextStrokeTransparency = 0.5
+    textLabel.Parent = billboard
+    
+    return billboard
+end
+
+local function updateGoldBlockESP()
+    if not VisualModule.Settings.GoldBlock then
+        -- Clean up all gold block ESP
+        for obj, data in pairs(ObjectESP.GoldBlocks) do
+            if data.billboard then
+                pcall(function() data.billboard:Destroy() end)
+            end
+        end
+        ObjectESP.GoldBlocks = {}
+        return
+    end
+    
+    -- Find all gold blocks
+    local foundBlocks = findObjectsInWorkspace("GoldBlock")
+    
+    -- Also search for "Gold" or "GoldOre" variations
+    for obj in pairs(findObjectsInWorkspace("Gold")) do
+        foundBlocks[obj] = true
+    end
+    for obj in pairs(findObjectsInWorkspace("GoldOre")) do
+        foundBlocks[obj] = true
+    end
+    
+    -- Create ESP for new blocks
+    for block in pairs(foundBlocks) do
+        if not ObjectESP.GoldBlocks[block] then
+            local billboard = createObjectBillboard(block, ObjectDecals.GoldBlock, "GoldBlock")
+            if billboard then
+                ObjectESP.GoldBlocks[block] = {
+                    object = block,
+                    billboard = billboard
+                }
+            end
+        end
+    end
+    
+    -- Remove ESP for blocks that no longer exist
+    for block, data in pairs(ObjectESP.GoldBlocks) do
+        if not foundBlocks[block] or not block.Parent then
+            if data.billboard then
+                pcall(function() data.billboard:Destroy() end)
+            end
+            ObjectESP.GoldBlocks[block] = nil
+        end
+    end
+end
+
+local function updateGraveESP()
+    if not VisualModule.Settings.Grave then
+        -- Clean up all grave ESP
+        for obj, data in pairs(ObjectESP.Graves) do
+            if data.billboard then
+                pcall(function() data.billboard:Destroy() end)
+            end
+        end
+        ObjectESP.Graves = {}
+        return
+    end
+    
+    -- Find all graves - search multiple possible names
+    local foundGraves = findObjectsInWorkspace("Grave")
+    
+    -- Also search for variations
+    for obj in pairs(findObjectsInWorkspace("Gravestone")) do
+        foundGraves[obj] = true
+    end
+    for obj in pairs(findObjectsInWorkspace("Tombstone")) do
+        foundGraves[obj] = true
+    end
+    
+    -- Create ESP for new graves
+    for grave in pairs(foundGraves) do
+        if not ObjectESP.Graves[grave] then
+            local billboard = createObjectBillboard(grave, ObjectDecals.Grave, "Grave")
+            if billboard then
+                ObjectESP.Graves[grave] = {
+                    object = grave,
+                    billboard = billboard
+                }
+            end
+        end
+    end
+    
+    -- Remove ESP for graves that no longer exist
+    for grave, data in pairs(ObjectESP.Graves) do
+        if not foundGraves[grave] or not grave.Parent then
+            if data.billboard then
+                pcall(function() data.billboard:Destroy() end)
+            end
+            ObjectESP.Graves[grave] = nil
+        end
+    end
+end
+
 local function wipeAllESP()
-    -- Remove all ESP folders from CoreGui
     for _, obj in pairs(CoreGui:GetChildren()) do
         if obj:IsA("Folder") and obj.Name:match("^ESP") then
             pcall(function() obj:Destroy() end)
         end
+        if obj:IsA("BillboardGui") and obj.Name:match("^ObjectESP") then
+            pcall(function() obj:Destroy() end)
+        end
     end
     
-    -- Clear all drawing objects
     for player, data in pairs(ESPObjects) do
         if data.boxLines then
             for _, line in pairs(data.boxLines) do
@@ -107,7 +272,6 @@ local function wipeAllESP()
         end
     end
     
-    -- Clear object ESP
     for _, data in pairs(ObjectESP.GoldBlocks) do
         if data.billboard then
             pcall(function() data.billboard:Destroy() end)
@@ -119,127 +283,15 @@ local function wipeAllESP()
         end
     end
     
-    -- Clear tables
     ESPObjects = {}
     ObjectESP.GoldBlocks = {}
     ObjectESP.Graves = {}
     
-    -- Temporarily disable ESP
     VisualModule.Settings.Enabled = false
     
-    -- Update toggle button to show DISABLED
     if espToggleButton then
         espToggleButton.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
         espToggleButton.Text = "DISABLED"
-    end
-end
-
-local function createObjectESP(object, espType, decalId)
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ObjectESP"
-    billboard.Size = UDim2.new(0, 100, 0, 100)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Adornee = object
-    billboard.Parent = CoreGui
-    
-    local imageLabel = Instance.new("ImageLabel")
-    imageLabel.Size = UDim2.new(1, 0, 1, 0)
-    imageLabel.BackgroundTransparency = 1
-    imageLabel.Image = decalId
-    imageLabel.ScaleType = Enum.ScaleType.Fit
-    imageLabel.Parent = billboard
-    
-    return billboard
-end
-
-local function updateObjectESP()
-    local currentTime = tick()
-    if currentTime - lastObjectUpdateTime < 10 then return end
-    lastObjectUpdateTime = currentTime
-    
-    -- Update Gold Block ESP
-    if VisualModule.Settings.GoldBlock then
-        local blocks = Workspace:FindFirstChild("Blocks")
-        if blocks then
-            -- Track existing gold blocks
-            local foundBlocks = {}
-            
-            for _, block in pairs(blocks:GetChildren()) do
-                if block:IsA("Model") and block.Name == "GoldBlock" then
-                    foundBlocks[block] = true
-                    
-                    -- Create ESP if doesn't exist
-                    if not ObjectESP.GoldBlocks[block] then
-                        local billboard = createObjectESP(block, "GoldBlock", ObjectDecals.GoldBlock)
-                        ObjectESP.GoldBlocks[block] = {
-                            object = block,
-                            billboard = billboard
-                        }
-                    end
-                end
-            end
-            
-            -- Remove ESP for blocks that no longer exist
-            for block, data in pairs(ObjectESP.GoldBlocks) do
-                if not foundBlocks[block] or not block.Parent then
-                    if data.billboard then
-                        pcall(function() data.billboard:Destroy() end)
-                    end
-                    ObjectESP.GoldBlocks[block] = nil
-                end
-            end
-        end
-    else
-        -- Hide all gold block ESP
-        for block, data in pairs(ObjectESP.GoldBlocks) do
-            if data.billboard then
-                pcall(function() data.billboard:Destroy() end)
-            end
-        end
-        ObjectESP.GoldBlocks = {}
-    end
-    
-    -- Update Grave ESP
-    if VisualModule.Settings.Grave then
-        local graves = Workspace:FindFirstChild("Graves")
-        if graves then
-            -- Track existing graves
-            local foundGraves = {}
-            
-            for _, grave in pairs(graves:GetChildren()) do
-                if grave:IsA("MeshPart") and grave.Name == "Grave" then
-                    foundGraves[grave] = true
-                    
-                    -- Create ESP if doesn't exist
-                    if not ObjectESP.Graves[grave] then
-                        local billboard = createObjectESP(grave, "Grave", ObjectDecals.Grave)
-                        ObjectESP.Graves[grave] = {
-                            object = grave,
-                            billboard = billboard
-                        }
-                    end
-                end
-            end
-            
-            -- Remove ESP for graves that no longer exist
-            for grave, data in pairs(ObjectESP.Graves) do
-                if not foundGraves[grave] or not grave.Parent then
-                    if data.billboard then
-                        pcall(function() data.billboard:Destroy() end)
-                    end
-                    ObjectESP.Graves[grave] = nil
-                end
-            end
-        end
-    else
-        -- Hide all grave ESP
-        for grave, data in pairs(ObjectESP.Graves) do
-            if data.billboard then
-                pcall(function() data.billboard:Destroy() end)
-            end
-        end
-        ObjectESP.Graves = {}
     end
 end
 
@@ -247,14 +299,12 @@ local function hideAllESP(player)
     if not ESPObjects[player] then return end
     local data = ESPObjects[player]
     
-    -- Hide 2D box lines
     if data.boxLines then
         for _, line in pairs(data.boxLines) do
             pcall(function() line.Visible = false end)
         end
     end
     
-    -- Hide health bar
     if data.healthBarBg then
         pcall(function() data.healthBarBg.Visible = false end)
     end
@@ -262,7 +312,6 @@ local function hideAllESP(player)
         pcall(function() data.healthBarFill.Visible = false end)
     end
     
-    -- Hide 3D boxes
     if data.boxHolder then
         pcall(function() 
             for _, box in pairs(data.boxHolder:GetChildren()) do
@@ -271,7 +320,6 @@ local function hideAllESP(player)
         end)
     end
     
-    -- Hide text labels and images
     if data.folder then
         for _, child in pairs(data.folder:GetChildren()) do
             if child:IsA("BillboardGui") then
@@ -282,12 +330,10 @@ local function hideAllESP(player)
 end
 
 local function createBoxes(character, holder, teamColor)
-    -- Clear existing boxes
     for _, child in pairs(holder:GetChildren()) do
         child:Destroy()
     end
     
-    -- Create box for each body part (auto-scaling)
     for _, part in ipairs(character:GetChildren()) do
         if part:IsA("BasePart") then
             local box = Instance.new("BoxHandleAdornment")
@@ -311,7 +357,6 @@ local function createESP(player)
     espFolder.Name = "ESP_" .. player.Name
     espFolder.Parent = CoreGui
     
-    -- Create 2D box lines
     local boxLines = {}
     for i = 1, 4 do
         local line = createDrawing("Line")
@@ -320,19 +365,16 @@ local function createESP(player)
         boxLines[i] = line
     end
     
-    -- Create health bar background (black outline)
     local healthBarBg = createDrawing("Line")
     healthBarBg.Thickness = 5
     healthBarBg.Color = Color3.fromRGB(0, 0, 0)
     healthBarBg.Visible = false
     
-    -- Create health bar fill (green)
     local healthBarFill = createDrawing("Line")
     healthBarFill.Thickness = 3
     healthBarFill.Color = Color3.fromRGB(0, 255, 0)
     healthBarFill.Visible = false
     
-    -- Create 3D box holder
     local boxHolder = Instance.new("Folder")
     boxHolder.Name = "BoxHolder"
     boxHolder.Parent = espFolder
@@ -372,7 +414,6 @@ local function updateESP(player)
     local data = ESPObjects[player]
     if not data then return end
     
-    -- Team Check
     local shouldHide = false
     if VisualModule.Settings.TeamCheck then
         if player.Team and Players.LocalPlayer.Team and player.Team == Players.LocalPlayer.Team then
@@ -402,59 +443,50 @@ local function updateESP(player)
         if onScreenTL and onScreenTR and onScreenBL and onScreenBR then
             local teamColor = getTeamColor(player)
             
-            -- Top line
             data.boxLines[1].From = screenTopLeft
             data.boxLines[1].To = screenTopRight
             data.boxLines[1].Color = teamColor
             data.boxLines[1].Visible = true
             
-            -- Bottom line
             data.boxLines[2].From = screenBottomLeft
             data.boxLines[2].To = screenBottomRight
             data.boxLines[2].Color = teamColor
             data.boxLines[2].Visible = true
             
-            -- Left line
             data.boxLines[3].From = screenTopLeft
             data.boxLines[3].To = screenBottomLeft
             data.boxLines[3].Color = teamColor
             data.boxLines[3].Visible = true
             
-            -- Right line
             data.boxLines[4].From = screenTopRight
             data.boxLines[4].To = screenBottomRight
             data.boxLines[4].Color = teamColor
             data.boxLines[4].Visible = true
             
-            -- Health bar (using screen positions from box)
             if VisualModule.Settings.Health and data.healthBarBg and data.healthBarFill then
                 local healthPercent = humanoid.Health / humanoid.MaxHealth
                 
-                -- Calculate health bar position (5 pixels to the right of box)
                 local barX = screenTopRight.X + 5
                 local barTop = screenTopRight.Y
                 local barBottom = screenBottomRight.Y
                 local barHeight = barBottom - barTop
                 
-                -- Background bar (full height, black outline)
                 data.healthBarBg.From = Vector2.new(barX, barTop)
                 data.healthBarBg.To = Vector2.new(barX, barBottom)
                 data.healthBarBg.Visible = true
                 
-                -- Health fill bar (scaled by health percentage from bottom up)
                 local fillHeight = barHeight * healthPercent
                 local fillTop = barBottom - fillHeight
                 data.healthBarFill.From = Vector2.new(barX, barBottom)
                 data.healthBarFill.To = Vector2.new(barX, fillTop)
                 data.healthBarFill.Visible = true
                 
-                -- Color based on health percentage
                 if healthPercent > 0.6 then
-                    data.healthBarFill.Color = Color3.fromRGB(0, 255, 0) -- Green
+                    data.healthBarFill.Color = Color3.fromRGB(0, 255, 0)
                 elseif healthPercent > 0.3 then
-                    data.healthBarFill.Color = Color3.fromRGB(255, 255, 0) -- Yellow
+                    data.healthBarFill.Color = Color3.fromRGB(255, 255, 0)
                 else
-                    data.healthBarFill.Color = Color3.fromRGB(255, 0, 0) -- Red
+                    data.healthBarFill.Color = Color3.fromRGB(255, 0, 0)
                 end
             else
                 if data.healthBarBg then data.healthBarBg.Visible = false end
@@ -468,7 +500,6 @@ local function updateESP(player)
             if data.healthBarFill then data.healthBarFill.Visible = false end
         end
         
-        -- Ensure 3D boxes are created but hidden
         if data.boxHolder:GetChildren()[1] == nil then
             local teamColor = getTeamColor(player)
             createBoxes(character, data.boxHolder, teamColor)
@@ -528,7 +559,7 @@ local function updateESP(player)
         end
     end
     
-    -- Type ESP - Show decal image on torso
+    -- Type ESP
     local typeLabel = data.folder:FindFirstChild("TypeLabel")
     local playerType = getPlayerType(character)
     
@@ -573,7 +604,6 @@ end
 local function updateAllESP()
     for player, data in pairs(ESPObjects) do
         if not Players:FindFirstChild(player.Name) then
-            -- Cleanup
             if data.boxLines then
                 for _, line in pairs(data.boxLines) do
                     pcall(function() line:Remove() end)
@@ -593,9 +623,6 @@ local function updateAllESP()
             pcall(function() updateESP(player) end)
         end
     end
-    
-    -- Update object ESP every frame
-    pcall(updateObjectESP)
 end
 
 local function toggleESP(enabled)
@@ -614,6 +641,14 @@ local function toggleESP(enabled)
                 pcall(updateAllESP)
             end)
         end
+        
+        -- Start object ESP update loop
+        if not objectUpdateConnection then
+            objectUpdateConnection = RunService.Heartbeat:Connect(function()
+                pcall(updateGoldBlockESP)
+                pcall(updateGraveESP)
+            end)
+        end
     else
         for player, data in pairs(ESPObjects) do
             hideAllESP(player)
@@ -623,6 +658,15 @@ local function toggleESP(enabled)
             espUpdateConnection:Disconnect()
             espUpdateConnection = nil
         end
+        
+        if objectUpdateConnection then
+            objectUpdateConnection:Disconnect()
+            objectUpdateConnection = nil
+        end
+        
+        -- Clean up object ESP
+        updateGoldBlockESP()
+        updateGraveESP()
     end
 end
 
@@ -643,7 +687,6 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
--- Handle existing players' respawns
 for _, player in pairs(Players:GetPlayers()) do
     if player ~= Players.LocalPlayer then
         player.CharacterAdded:Connect(function(character)
@@ -709,12 +752,13 @@ function VisualModule.CreateUI(parent)
         
         checkbox.MouseButton1Click:Connect(function()
             VisualModule.Settings[settingKey] = not VisualModule.Settings[settingKey]
-            checkmark.Text = VisualModule.Settings[settingKey] and "✓" or ""
+            checkmark.Text = VisualModule.Settings[settingKey] and "X" or ""
             
-            -- Force object ESP update
-            if settingKey == "GoldBlock" or settingKey == "Grave" then
-                lastObjectUpdateTime = 0
-                pcall(updateObjectESP)
+            -- Force immediate update for object ESP
+            if settingKey == "GoldBlock" then
+                updateGoldBlockESP()
+            elseif settingKey == "Grave" then
+                updateGraveESP()
             else
                 for player, data in pairs(ESPObjects) do
                     pcall(function() updateESP(player) end)
@@ -756,6 +800,10 @@ function VisualModule.CreateUI(parent)
         toggleButton.AutoButtonColor = false
         toggleButton.Parent = container
         
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = toggleButton
+        
         espToggleButton = toggleButton
         
         toggleButton.MouseButton1Click:Connect(function()
@@ -772,7 +820,6 @@ function VisualModule.CreateUI(parent)
         end)
     end
     
-    -- Wipe Button
     local function createWipeButton(yPos)
         local wipeButton = Instance.new("TextButton")
         wipeButton.Size = UDim2.new(1, -20, 0, 40)
@@ -788,6 +835,10 @@ function VisualModule.CreateUI(parent)
         wipeButton.TextStrokeTransparency = 1
         wipeButton.AutoButtonColor = false
         wipeButton.Parent = visualContent
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = wipeButton
         
         wipeButton.MouseButton1Click:Connect(function()
             wipeAllESP()
@@ -820,6 +871,11 @@ function VisualModule.Cleanup()
         espUpdateConnection:Disconnect()
         espUpdateConnection = nil
     end
+    if objectUpdateConnection then
+        objectUpdateConnection:Disconnect()
+        objectUpdateConnection = nil
+    end
+    
     for player, data in pairs(ESPObjects) do
         if data.boxLines then
             for _, line in pairs(data.boxLines) do
@@ -838,7 +894,6 @@ function VisualModule.Cleanup()
     end
     ESPObjects = {}
     
-    -- Clean object ESP
     for _, data in pairs(ObjectESP.GoldBlocks) do
         if data.billboard then
             pcall(function() data.billboard:Destroy() end)
