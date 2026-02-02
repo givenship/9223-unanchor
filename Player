@@ -1,11 +1,13 @@
--- Player Module
+-- Player Module (Fixed)
 -- Features: Reset Character, Lock Jumppower, Noclip, Invisible
+-- FIX: Invisible Y offset now uses positive value after reset
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local PlayerModule = {}
@@ -17,8 +19,8 @@ getgenv().PlayerSettings = {
     JumppowerValue = 50,
     Noclip = false,
     Invisible = false,
-    InvisibleYOffset = -2, -- Y offset for invisible
-    KeepOnGround = false -- Keep player on ground during invisible
+    InvisibleYOffset = 2, -- Y offset for invisible (POSITIVE value now)
+    KeepOnGround = false
 }
 
 -- Connections
@@ -30,22 +32,18 @@ local carpet = nil
 local carpetLoop = nil
 local carpetDied = nil
 
--- Check if character is R15
 local function isR15(character)
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return false end
     return humanoid.RigType == Enum.HumanoidRigType.R15
 end
 
--- Get character root part
 local function getRoot(character)
     return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso"))
 end
 
--- Enable Reset Character
 local function enableReset()
     if getgenv().PlayerSettings.ResetEnabled then
-        -- Method 1: Fire fall damage remote
         local success = pcall(function()
             local args = {"Damage", math.huge}
             ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("FallDamage"):FireServer(unpack(args))
@@ -54,7 +52,6 @@ local function enableReset()
         if success then
             print("Reset character via fall damage")
         else
-            -- Method 2: Enable CoreGui reset button
             pcall(function()
                 StarterGui:SetCore("ResetButtonCallback", true)
                 print("Reset button enabled")
@@ -63,7 +60,6 @@ local function enableReset()
     end
 end
 
--- Lock Jumppower
 local function lockJumppower()
     if jumppowerConnection then
         jumppowerConnection:Disconnect()
@@ -75,16 +71,13 @@ local function lockJumppower()
             if LocalPlayer.Character then
                 local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                 if humanoid then
-                    -- Disable UseJumpPower to force JumpHeight mode
                     humanoid.UseJumpPower = false
-                    -- Set JumpHeight
                     humanoid.JumpHeight = getgenv().PlayerSettings.JumppowerValue
                 end
             end
         end)
         print("JumpHeight locked to", getgenv().PlayerSettings.JumppowerValue)
     else
-        -- Re-enable UseJumpPower when disabled
         if LocalPlayer.Character then
             local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if humanoid then
@@ -95,7 +88,6 @@ local function lockJumppower()
     end
 end
 
--- Noclip
 local function toggleNoclip()
     if noclipConnection then
         noclipConnection:Disconnect()
@@ -111,7 +103,6 @@ local function toggleNoclip()
                     end
                 end
                 
-                -- Re-enable collision for Map parts
                 local map = workspace:FindFirstChild("Map")
                 if map then
                     for _, part in pairs(map:GetDescendants()) do
@@ -124,7 +115,6 @@ local function toggleNoclip()
         end)
         print("Noclip enabled (excluding Map)")
     else
-        -- Re-enable collision
         if LocalPlayer.Character then
             for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -136,7 +126,6 @@ local function toggleNoclip()
     end
 end
 
--- Invisible (Carpet method with input-based movement)
 local invisiblePosition = nil
 
 local function toggleInvisible()
@@ -158,6 +147,21 @@ local function toggleInvisible()
         carpetDied = nil
     end
     
+    -- Re-enable ground collision when disabling
+    if not getgenv().PlayerSettings.Invisible then
+        local map = Workspace:FindFirstChild("Map")
+        if map then
+            for _, part in pairs(map:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+        invisiblePosition = nil
+        print("Invisible disabled")
+        return
+    end
+    
     if getgenv().PlayerSettings.Invisible then
         if isR15(LocalPlayer.Character) then
             print("Warning: Invisible works best with R6")
@@ -166,7 +170,6 @@ local function toggleInvisible()
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid then return end
         
-        -- Stop all other animations
         local animator = humanoid:FindFirstChildOfClass("Animator")
         if animator then
             for _, track in pairs(animator:GetPlayingAnimationTracks()) do
@@ -174,20 +177,18 @@ local function toggleInvisible()
             end
         end
         
-        -- Apply carpet animation
         carpetAnim = Instance.new("Animation")
         carpetAnim.AnimationId = "rbxassetid://282574440"
         carpet = humanoid:LoadAnimation(carpetAnim)
         carpet:Play(.1, 1, 1)
         
-        -- Get initial position with Y offset
         local root = getRoot(LocalPlayer.Character)
         if not root then return end
         
-        local yOffset = getgenv().PlayerSettings.InvisibleYOffset or -2
+        -- FIX: Use NEGATIVE of the positive offset value
+        local yOffset = -math.abs(getgenv().PlayerSettings.InvisibleYOffset or 2)
         invisiblePosition = root.Position + Vector3.new(0, yOffset, 0)
         
-        -- Handle death
         carpetDied = humanoid.Died:Connect(function()
             if carpetLoop then carpetLoop:Disconnect() end
             if carpet then carpet:Stop() end
@@ -196,16 +197,13 @@ local function toggleInvisible()
             invisiblePosition = nil
         end)
         
-        -- Movement speed
         local moveSpeed = 0.5
         
-        -- Movement loop
         carpetLoop = RunService.RenderStepped:Connect(function()
             pcall(function()
                 local root = getRoot(LocalPlayer.Character)
                 if not root then return end
                 
-                -- Noclip ground (Workspace.Map)
                 local map = Workspace:FindFirstChild("Map")
                 if map then
                     for _, part in pairs(map:GetDescendants()) do
@@ -215,11 +213,9 @@ local function toggleInvisible()
                     end
                 end
                 
-                -- Get camera direction
                 local camera = workspace.CurrentCamera
                 local cameraCFrame = camera.CFrame
                 
-                -- Calculate movement direction based on input
                 local moveDirection = Vector3.new(0, 0, 0)
                 
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then
@@ -241,14 +237,12 @@ local function toggleInvisible()
                     moveDirection = moveDirection - Vector3.new(0, 1, 0)
                 end
                 
-                -- Normalize and apply speed
                 local nextPosition = invisiblePosition
                 if moveDirection.Magnitude > 0 then
                     moveDirection = moveDirection.Unit * moveSpeed
                     nextPosition = invisiblePosition + moveDirection
                 end
                 
-                -- Keep on ground if enabled - predict next position
                 if getgenv().PlayerSettings.KeepOnGround then
                     local rayOrigin = nextPosition + Vector3.new(0, 50, 0)
                     local rayDirection = Vector3.new(0, -100, 0)
@@ -260,7 +254,6 @@ local function toggleInvisible()
                     local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
                     
                     if rayResult then
-                        -- Adjust Y to ground height before moving
                         nextPosition = Vector3.new(
                             nextPosition.X,
                             rayResult.Position.Y,
@@ -269,27 +262,12 @@ local function toggleInvisible()
                     end
                 end
                 
-                -- Update position
                 invisiblePosition = nextPosition
-                
-                -- Set character position (don't lock, just move)
                 root.CFrame = CFrame.new(invisiblePosition)
             end)
         end)
         
         print("Invisible enabled - Ground noclipped, use WASD/E/Q to move")
-    else
-        -- Re-enable ground collision
-        local map = Workspace:FindFirstChild("Map")
-        if map then
-            for _, part in pairs(map:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
-        end
-        invisiblePosition = nil
-        print("Invisible disabled")
     end
 end
 
@@ -303,8 +281,7 @@ function PlayerModule.CreateUI(parent)
     
     local yPos = 10
     
-    -- Helper function to create checkbox
-    local function createCheckbox(name, settingsTable, settingKey, position)
+    local function createCheckbox(name, settingsTable, settingKey, position, callback)
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, -20, 0, 35)
         container.Position = UDim2.new(0, 10, 0, position)
@@ -317,7 +294,7 @@ function PlayerModule.CreateUI(parent)
         checkbox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         checkbox.BorderSizePixel = 1
         checkbox.BorderColor3 = Color3.fromRGB(255, 255, 255)
-        checkbox.Text = settingsTable[settingKey] and "✓" or ""
+        checkbox.Text = settingsTable[settingKey] and "X" or ""
         checkbox.Font = Enum.Font.GothamBold
         checkbox.TextSize = 18
         checkbox.TextColor3 = Color3.fromRGB(0, 255, 0)
@@ -336,13 +313,13 @@ function PlayerModule.CreateUI(parent)
         
         checkbox.MouseButton1Click:Connect(function()
             settingsTable[settingKey] = not settingsTable[settingKey]
-            checkbox.Text = settingsTable[settingKey] and "✓" or ""
+            checkbox.Text = settingsTable[settingKey] and "X" or ""
+            if callback then callback(settingsTable[settingKey]) end
         end)
         
         return position + 45
     end
     
-    -- Helper function to create toggle button
     local function createToggleButton(name, settingsTable, settingKey, position, callback)
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(1, -20, 0, 35)
@@ -355,6 +332,10 @@ function PlayerModule.CreateUI(parent)
         button.TextColor3 = Color3.fromRGB(255, 255, 255)
         button.Parent = playerContent
         
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = button
+        
         button.MouseButton1Click:Connect(function()
             settingsTable[settingKey] = not settingsTable[settingKey]
             button.BackgroundColor3 = settingsTable[settingKey] and Color3.fromRGB(30, 144, 255) or Color3.fromRGB(60, 60, 60)
@@ -365,7 +346,6 @@ function PlayerModule.CreateUI(parent)
         return position + 45
     end
     
-    -- Helper function to create slider
     local function createSlider(name, settingsTable, settingKey, minVal, maxVal, position)
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, -20, 0, 50)
@@ -427,7 +407,6 @@ function PlayerModule.CreateUI(parent)
                 sliderFill.Size = UDim2.new((value - minVal) / (maxVal - minVal), 0, 1, 0)
                 label.Text = name .. ": " .. value
                 
-                -- Update jumppower if lock is enabled
                 if settingKey == "JumppowerValue" and getgenv().PlayerSettings.LockJumppower then
                     lockJumppower()
                 end
@@ -503,7 +482,8 @@ function PlayerModule.CreateUI(parent)
     yPos = yPos + 40
     
     yPos = createToggleButton("Invisible", getgenv().PlayerSettings, "Invisible", yPos, toggleInvisible)
-    yPos = createSlider("Y Offset", getgenv().PlayerSettings, "InvisibleYOffset", -10, 10, yPos)
+    -- FIX: Y Offset slider now shows positive values (1-10)
+    yPos = createSlider("Y Offset", getgenv().PlayerSettings, "InvisibleYOffset", 1, 10, yPos)
     yPos = createCheckbox("Keep On Ground", getgenv().PlayerSettings, "KeepOnGround", yPos)
     
     local invisNote = Instance.new("TextLabel")
@@ -523,23 +503,21 @@ function PlayerModule.CreateUI(parent)
 end
 
 function PlayerModule.Cleanup()
-    if jumppowerConnection then
-        jumppowerConnection:Disconnect()
-    end
-    if noclipConnection then
-        noclipConnection:Disconnect()
-    end
-    if carpetLoop then
-        carpetLoop:Disconnect()
-    end
-    if carpet then
-        carpet:Stop()
-    end
-    if carpetAnim then
-        carpetAnim:Destroy()
-    end
-    if carpetDied then
-        carpetDied:Disconnect()
+    if jumppowerConnection then jumppowerConnection:Disconnect() end
+    if noclipConnection then noclipConnection:Disconnect() end
+    if carpetLoop then carpetLoop:Disconnect() end
+    if carpet then carpet:Stop() end
+    if carpetAnim then carpetAnim:Destroy() end
+    if carpetDied then carpetDied:Disconnect() end
+    
+    -- Re-enable ground collision
+    local map = Workspace:FindFirstChild("Map")
+    if map then
+        for _, part in pairs(map:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
     end
 end
 
