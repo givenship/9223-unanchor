@@ -11,8 +11,8 @@ Decorations.FadeElements = {}
 local DecoConfigs = {
     -- Content area decorations
     Content = {
-        {name = "TreeL", asset = "TreeL", size = {40,40}, pos = {0,10,1,-50}, trans = 0.4, zindex = 60},
-        {name = "TreeR", asset = "TreeR", size = {40,40}, pos = {1,-50,0,10}, trans = 0.4, rot = 180, zindex = 60},
+        {name = "TreeL", asset = "TreeL", size = {150,150}, pos = {0,-10,1,-120}, trans = 0.4, zindex = 60},
+        {name = "TreeR", asset = "TreeR", size = {100,100}, pos = {1,-110,0,40}, trans = 0.4, rot = 180, zindex = 60},
     },
     -- MainFrame decorations
     Main = {
