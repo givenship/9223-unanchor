@@ -187,10 +187,10 @@ Layout.PlayIntroAnimation()
 Layout.StartStatsLoop()
 
 ------------------------------------------
--- KEYBIND (Right Alt to toggle)
+-- KEYBIND (Right Shift to toggle)
 ------------------------------------------
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.RightAlt and not gameProcessed then
+    if input.KeyCode == Enum.KeyCode.RightShift and not gameProcessed then
         Layout.MainFrame.Visible = not Layout.MainFrame.Visible
         print("[Euva] GUI toggled:", Layout.MainFrame.Visible and "Visible" or "Hidden")
     end
