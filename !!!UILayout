@@ -27,19 +27,25 @@ Layout.Blur = nil
 Layout.IntroLine = nil
 Layout.DragEnabled = false
 
+-- Line refs for transparency control
+Layout.OuterLineFrames = {}
+Layout.GridLineFrames = {}
+
 -- Server/User info refs
 Layout.GameNameLabel = nil
 Layout.JobTextBox = nil
 Layout.PlayerCountLabel = nil
 Layout.StatsLabel = nil
 Layout.MoneyLabel = nil
+Layout.ServerInfoButton = nil
+Layout.ServerInfoWindow = nil
 
 -- Title animation refs
 Layout.TitleCursor = nil
 Layout.TitleUnderline = nil
 
 local player = Players.LocalPlayer
-local guiTransValue = 0.4
+local guiTransValue = 0.1 -- Default 10%
 
 local function tween(obj, time, props, style, dir)
     style = style or Enum.EasingStyle.Quad
@@ -53,12 +59,12 @@ end
 -- TABLE-DRIVEN DEFINITIONS
 ------------------------------------------
 
--- Outer border lines {size, position}
+-- Outer border lines {size, position} - relative to MainFrame
 local OuterBorders = {
-    {UDim2.new(0, 820, 0, 1), UDim2.new(0.5, -410, 0.5, -260)}, -- top
-    {UDim2.new(0, 820, 0, 1), UDim2.new(0.5, -410, 0.5, 260)},  -- bottom
-    {UDim2.new(0, 1, 0, 520), UDim2.new(0.5, -410, 0.5, -260)}, -- left
-    {UDim2.new(0, 1, 0, 520), UDim2.new(0.5, 410, 0.5, -260)},  -- right
+    {UDim2.new(1, 20, 0, 1), UDim2.new(0, -10, 0, -10)},   -- top
+    {UDim2.new(1, 20, 0, 1), UDim2.new(0, -10, 1, 10)},    -- bottom
+    {UDim2.new(0, 1, 1, 20), UDim2.new(0, -10, 0, -10)},   -- left
+    {UDim2.new(0, 1, 1, 20), UDim2.new(1, 10, 0, -10)},    -- right
 }
 
 -- Grid lines {size, position}
@@ -95,30 +101,6 @@ function Layout.Create(CoreGui)
         Parent = CoreGui,
     })
     
-    -- Outer lines container
-    local outerLines = ui("Frame", {
-        Name = "OuterLines",
-        BackgroundTransparency = 1,
-        Size = UDim2.fromScale(1, 1),
-        ZIndex = 5,
-        Parent = Layout.Gui,
-    })
-    
-    -- Create outer borders from table
-    for _, b in ipairs(OuterBorders) do
-        ui("Frame", {
-            BackgroundColor3 = THEME.Line,
-            BackgroundTransparency = 0.35,
-            BorderSizePixel = 0,
-            Size = b[1],
-            Position = b[2],
-            ZIndex = 5,
-            Active = false,
-            Selectable = false,
-            Parent = outerLines,
-        })
-    end
-    
     -- Main frame
     Layout.MainFrame = ui("Frame", {
         Name = "MainFrame",
@@ -135,17 +117,46 @@ function Layout.Create(CoreGui)
         ui("UICorner", {CornerRadius = UDim.new(0, 12)})
     })
     
+    -- Outer lines container (now parented to MainFrame)
+    local outerLines = ui("Frame", {
+        Name = "OuterLines",
+        BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1),
+        Position = UDim2.fromScale(0, 0),
+        ZIndex = 5,
+        Parent = Layout.MainFrame,
+    })
+    
+    -- Create outer borders from table
+    Layout.OuterLineFrames = {}
+    for _, b in ipairs(OuterBorders) do
+        local line = ui("Frame", {
+            BackgroundColor3 = THEME.Line,
+            BackgroundTransparency = 0.35 + guiTransValue * 0.5,
+            BorderSizePixel = 0,
+            Size = b[1],
+            Position = b[2],
+            ZIndex = 5,
+            Active = false,
+            Selectable = false,
+            Parent = outerLines,
+        })
+        table.insert(Layout.OuterLineFrames, line)
+    end
+    
     -- Grid lines from table
+    Layout.GridLineFrames = {}
     for _, g in ipairs(GridLines) do
-        ui("Frame", {
+        local line = ui("Frame", {
             Size = g[1],
             Position = g[2],
             BackgroundColor3 = THEME.Line,
-            BackgroundTransparency = 0.35,
+            BackgroundTransparency = 0.35 + guiTransValue * 0.5,
             BorderSizePixel = 0,
             ZIndex = 70,
             Parent = Layout.MainFrame,
         })
+        table.insert(Layout.GridLineFrames, line)
     end
     
     -- Gradient background
@@ -307,87 +318,287 @@ function Layout.CreateContentArea()
 end
 
 ------------------------------------------
--- SERVER INFO
+-- SERVER INFO (Button + Popup Window)
 ------------------------------------------
 function Layout.CreateServerInfo()
     local THEME = Layout.Theme.Colors
     local ui = Layout.ui
     
-    local serverFrame = ui("Frame", {
-        Name = "ServerInfoFrame",
-        Size = UDim2.fromOffset(260, 54),
-        Position = UDim2.new(1, -450, 0, 0),
+    -- Server Info Button
+    Layout.ServerInfoButton = ui("TextButton", {
+        Name = "ServerInfoButton",
+        Size = UDim2.fromOffset(140, 36),
+        Position = UDim2.new(1, -330, 0, 2),
         BackgroundColor3 = THEME.Soft,
         BackgroundTransparency = 0.35,
         BorderSizePixel = 0,
+        Text = "📊 Server Info",
+        Font = Enum.Font.GothamBold,
+        TextSize = 13,
+        TextColor3 = THEME.Text,
+        AutoButtonColor = false,
         ZIndex = 25,
         Parent = Layout.ContentArea,
     }, {
-        ui("UICorner", {CornerRadius = UDim.new(0, 8)}),
-        ui("UIPadding", {PaddingLeft = UDim.new(0,10), PaddingRight = UDim.new(0,10), PaddingTop = UDim.new(0,6), PaddingBottom = UDim.new(0,6)}),
-        ui("UIListLayout", {FillDirection = Enum.FillDirection.Vertical, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2)})
+        ui("UICorner", {CornerRadius = UDim.new(0, 8)})
     })
     
-    Layout.GameNameLabel = ui("TextLabel", {
+    -- Hover effects
+    Layout.ServerInfoButton.MouseEnter:Connect(function()
+        Layout.ServerInfoButton.BackgroundTransparency = 0.2
+    end)
+    Layout.ServerInfoButton.MouseLeave:Connect(function()
+        Layout.ServerInfoButton.BackgroundTransparency = 0.35
+    end)
+    
+    -- Create popup window (initially hidden)
+    Layout.CreateServerInfoWindow()
+    
+    -- Toggle window on click
+    Layout.ServerInfoButton.MouseButton1Click:Connect(function()
+        if Layout.ServerInfoWindow then
+            Layout.ServerInfoWindow.Visible = not Layout.ServerInfoWindow.Visible
+            if Layout.ServerInfoWindow.Visible then
+                Layout.UpdateServerInfo()
+            end
+        end
+    end)
+end
+
+function Layout.CreateServerInfoWindow()
+    local THEME = Layout.Theme.Colors
+    local ui = Layout.ui
+    
+    -- Popup window
+    Layout.ServerInfoWindow = ui("Frame", {
+        Name = "ServerInfoWindow",
+        Size = UDim2.fromOffset(320, 200),
+        Position = UDim2.new(0.5, -160, 0.5, -100),
+        AnchorPoint = Vector2.new(0, 0),
+        BackgroundColor3 = THEME.Base,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 200,
+        Parent = Layout.Gui,
+    }, {
+        ui("UICorner", {CornerRadius = UDim.new(0, 12)}),
+        ui("UIStroke", {Color = THEME.Line, Thickness = 1, Transparency = 0.5})
+    })
+    
+    -- Window header
+    local header = ui("Frame", {
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = THEME.Soft,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        ZIndex = 201,
+        Parent = Layout.ServerInfoWindow,
+    }, {
+        ui("UICorner", {CornerRadius = UDim.new(0, 12)})
+    })
+    
+    -- Fix bottom corners of header
+    ui("Frame", {
+        Size = UDim2.new(1, 0, 0, 12),
+        Position = UDim2.new(0, 0, 1, -12),
+        BackgroundColor3 = THEME.Soft,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        ZIndex = 201,
+        Parent = header,
+    })
+    
+    ui("TextLabel", {
+        Size = UDim2.new(1, -50, 1, 0),
+        Position = UDim2.new(0, 15, 0, 0),
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 14),
-        Font = Enum.Font.Gotham,
-        TextSize = 12,
-        TextColor3 = THEME.TextMuted,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        ZIndex = 26,
-        Parent = serverFrame,
+        Text = "📊 Server Information",
+        Font = Enum.Font.GothamBold,
+        TextSize = 16,
+        TextColor3 = THEME.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 202,
+        Parent = header,
     })
     
+    -- Close button
+    local closeBtn = ui("TextButton", {
+        Size = UDim2.fromOffset(30, 30),
+        Position = UDim2.new(1, -35, 0, 5),
+        BackgroundColor3 = THEME.Soft,
+        BorderSizePixel = 0,
+        Text = "×",
+        Font = Enum.Font.GothamBold,
+        TextSize = 20,
+        TextColor3 = THEME.Text,
+        ZIndex = 202,
+        Parent = header,
+    }, {
+        ui("UICorner", {CornerRadius = UDim.new(0, 6)})
+    })
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        Layout.ServerInfoWindow.Visible = false
+    end)
+    
+    closeBtn.MouseEnter:Connect(function()
+        closeBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+    closeBtn.MouseLeave:Connect(function()
+        closeBtn.BackgroundColor3 = THEME.Soft
+        closeBtn.TextColor3 = THEME.Text
+    end)
+    
+    -- Content area
+    local content = ui("Frame", {
+        Size = UDim2.new(1, -30, 1, -55),
+        Position = UDim2.new(0, 15, 0, 50),
+        BackgroundTransparency = 1,
+        ZIndex = 201,
+        Parent = Layout.ServerInfoWindow,
+    }, {
+        ui("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8)})
+    })
+    
+    -- Info rows
+    local function createInfoRow(labelText, valueName)
+        local row = ui("Frame", {
+            Size = UDim2.new(1, 0, 0, 24),
+            BackgroundTransparency = 1,
+            ZIndex = 202,
+            Parent = content,
+        })
+        
+        ui("TextLabel", {
+            Size = UDim2.new(0, 80, 1, 0),
+            BackgroundTransparency = 1,
+            Text = labelText,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = THEME.Text,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ZIndex = 202,
+            Parent = row,
+        })
+        
+        local valueLabel = ui("TextLabel", {
+            Name = valueName,
+            Size = UDim2.new(1, -90, 1, 0),
+            Position = UDim2.new(0, 90, 0, 0),
+            BackgroundTransparency = 1,
+            Text = "...",
+            Font = Enum.Font.Gotham,
+            TextSize = 12,
+            TextColor3 = THEME.TextMuted,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ZIndex = 202,
+            Parent = row,
+        })
+        
+        return valueLabel
+    end
+    
+    Layout.GameNameLabel = createInfoRow("Game:", "GameName")
+    Layout.PlayerCountLabel = createInfoRow("Players:", "PlayerCount")
+    
+    -- JobId row with copy button
     local jobRow = ui("Frame", {
+        Size = UDim2.new(1, 0, 0, 24),
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 14),
-        ZIndex = 26,
-        Parent = serverFrame,
+        ZIndex = 202,
+        Parent = content,
     })
     
-    Layout.JobTextBox = ui("TextBox", {
+    ui("TextLabel", {
+        Size = UDim2.new(0, 80, 1, 0),
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, -56, 1, 0),
-        ClearTextOnFocus = false,
-        TextEditable = true,
-        Font = Enum.Font.Gotham,
-        TextSize = 12,
-        TextColor3 = THEME.TextMuted,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        ZIndex = 26,
-        Parent = jobRow,
-    })
-    
-    local copyJob = ui("TextButton", {
-        Size = UDim2.new(0, 56, 1, 0),
-        Position = UDim2.new(1, -56, 0, 0),
-        BackgroundTransparency = 1,
-        Text = "[Copy]",
+        Text = "JobId:",
         Font = Enum.Font.GothamBold,
         TextSize = 12,
         TextColor3 = THEME.Text,
-        TextWrapped = true,
-        ZIndex = 27,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 202,
         Parent = jobRow,
     })
     
-    Layout.PlayerCountLabel = ui("TextLabel", {
+    Layout.JobTextBox = ui("TextBox", {
+        Size = UDim2.new(1, -140, 1, 0),
+        Position = UDim2.new(0, 90, 0, 0),
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 14),
+        Text = "...",
         Font = Enum.Font.Gotham,
-        TextSize = 12,
+        TextSize = 11,
         TextColor3 = THEME.TextMuted,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        ZIndex = 26,
-        Parent = serverFrame,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false,
+        TextEditable = false,
+        ZIndex = 202,
+        Parent = jobRow,
     })
     
-    copyJob.MouseButton1Click:Connect(function()
-        local ok = Layout.Components.TryClipboard(Layout.JobTextBox.Text)
-        if not ok then
-            Layout.Components.Notify("Clipboard blocked. Click JobId box and Ctrl+C.")
-            Layout.JobTextBox:CaptureFocus()
+    local copyBtn = ui("TextButton", {
+        Size = UDim2.fromOffset(50, 22),
+        Position = UDim2.new(1, -50, 0, 1),
+        BackgroundColor3 = THEME.Soft,
+        BorderSizePixel = 0,
+        Text = "Copy",
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        TextColor3 = THEME.Text,
+        ZIndex = 203,
+        Parent = jobRow,
+    }, {
+        ui("UICorner", {CornerRadius = UDim.new(0, 4)})
+    })
+    
+    copyBtn.MouseButton1Click:Connect(function()
+        local jobId = game.JobId ~= "" and game.JobId or "Local/Studio"
+        local ok = Layout.Components.TryClipboard(jobId)
+        if ok then
+            copyBtn.Text = "✓"
+            task.delay(1, function()
+                if copyBtn and copyBtn.Parent then
+                    copyBtn.Text = "Copy"
+                end
+            end)
+        else
+            Layout.Components.Notify("Clipboard blocked")
+        end
+    end)
+    
+    -- PlaceId row
+    local placeIdLabel = createInfoRow("PlaceId:", "PlaceId")
+    placeIdLabel.Text = tostring(game.PlaceId)
+    
+    -- PlaceVersion row
+    local versionLabel = createInfoRow("Version:", "Version")
+    versionLabel.Text = tostring(game.PlaceVersion)
+    
+    -- Make window draggable
+    local dragging, dragStart, startPos = false, nil, nil
+    
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Layout.ServerInfoWindow.Position
+        end
+    end)
+    
+    header.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            local delta = input.Position - dragStart
+            Layout.ServerInfoWindow.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
@@ -780,6 +991,21 @@ end
 function Layout.SetGuiTransparency(value)
     guiTransValue = value
     Layout.MainFrame.BackgroundTransparency = guiTransValue * 0.7
+    
+    -- Update outer lines transparency
+    local lineTrans = 0.35 + guiTransValue * 0.5
+    for _, line in ipairs(Layout.OuterLineFrames) do
+        if line and line.Parent then
+            line.BackgroundTransparency = lineTrans
+        end
+    end
+    
+    -- Update grid lines transparency
+    for _, line in ipairs(Layout.GridLineFrames) do
+        if line and line.Parent then
+            line.BackgroundTransparency = lineTrans
+        end
+    end
 end
 
 function Layout.SetBlur(value)
@@ -807,9 +1033,15 @@ end
 -- SERVER INFO UPDATE
 ------------------------------------------
 function Layout.UpdateServerInfo()
-    Layout.GameNameLabel.Text = "Game: " .. (game.Name or "Unknown")
-    Layout.JobTextBox.Text = "JobId: " .. (game.JobId ~= "" and game.JobId or "Local/Studio")
-    Layout.PlayerCountLabel.Text = "Players: " .. tostring(#Players:GetPlayers())
+    if Layout.GameNameLabel then
+        Layout.GameNameLabel.Text = game.Name or "Unknown"
+    end
+    if Layout.JobTextBox then
+        Layout.JobTextBox.Text = game.JobId ~= "" and game.JobId or "Local/Studio"
+    end
+    if Layout.PlayerCountLabel then
+        Layout.PlayerCountLabel.Text = tostring(#Players:GetPlayers()) .. " / " .. tostring(Players.MaxPlayers)
+    end
 end
 
 ------------------------------------------
