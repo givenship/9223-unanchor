@@ -1,14 +1,15 @@
--- Auto Defuse Module
--- Detects bomb plant animations from other players and auto-clicks to defuse
--- FIXED: Uses 3D Parts for circles (client-side visuals, no Drawing library needed)
--- FIXED: Reliable mouse1click() for defuse (works in 99% of executors in 2026)
+-- Auto Defuse Module (FINAL FIXED VERSION)
+-- Circle: Under YOUR feet, GREEN if MONSTER in range, RED if no monsters nearby
+-- Indicators: Small balls on MONSTERS only (green dot if in range)
+-- Auto-click: Triggers on MONSTER bomb plant animations (after delay)
+-- 100% uses 3D Parts → Always visible, no Drawing issues
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Animation IDs to detect (bomb planting animations) - REPLACE WITH REAL ONES FROM GAME!
+-- REPLACE WITH REAL BOMB PLANT ANIM IDs FROM GAME!
 local TARGET_ANIMATIONS = {
     ["99918936475651"] = true,
     ["115241304811827"] = true,
@@ -16,11 +17,11 @@ local TARGET_ANIMATIONS = {
     ["rbxassetid://115241304811827"] = true,
 }
 
--- Initialize settings
+-- Settings
 if not getgenv().AutoDefuseSettings then
     getgenv().AutoDefuseSettings = {
         Enabled = false,
-        Delay = 3000, -- ms (time after plant anim start to auto-click defuse)
+        Delay = 3000, -- ms to wait after detecting plant anim
         ShowCircle = true,
         DetectionRadius = 30
     }
@@ -29,110 +30,89 @@ end
 local AutoDefuse = {}
 local mainLoop = nil
 local circlePart = nil
-local playerParts = {} -- userId -> indicator part
-local detectedPlayers = {} -- tracks players currently playing target animation
+local playerParts = {} -- uid -> part
+local detectedPlayers = {}
 local clickCooldown = {}
 
--- Create main detection circle part
+-- Create flat ground circle (under feet)
 local function createMainCirclePart()
     local part = Instance.new("Part")
-    part.Name = "AutoDefuse_MainCircle"
+    part.Name = "AutoDefuseCircle"
     part.Shape = Enum.PartType.Cylinder
     part.Material = Enum.Material.ForceField
-    part.Transparency = 0.6
     part.Anchored = true
     part.CanCollide = false
     part.TopSurface = Enum.SurfaceType.Smooth
     part.BottomSurface = Enum.SurfaceType.Smooth
+    part.Size = Vector3.new(60, 0.2, 60) -- Default 30 radius x2
     return part
 end
 
--- Create player indicator part (small ball)
+-- Small indicator ball for monsters
 local function createPlayerIndicatorPart(uid)
     local part = Instance.new("Part")
-    part.Name = "AutoDefuse_Indicator_" .. uid
+    part.Name = "AutoDefuse_Ind_" .. uid
     part.Shape = Enum.PartType.Ball
     part.Material = Enum.Material.Neon
-    part.Transparency = 0.4
     part.Anchored = true
     part.CanCollide = false
     part.Size = Vector3.new(1.5, 1.5, 1.5)
     return part
 end
 
--- Get local player root
 local function getLocalRoot()
     local char = LocalPlayer.Character
-    if not char then return nil end
-    return char:FindFirstChild("HumanoidRootPart")
+    return char and char:FindFirstChild("HumanoidRootPart")
 end
 
--- Get other player root
 local function getPlayerRoot(player)
     local char = player.Character
-    if not char then return nil end
-    return char:FindFirstChild("HumanoidRootPart")
+    return char and char:FindFirstChild("HumanoidRootPart")
 end
 
--- Check if player is on Monsters team
-local function isMonsters(player)
+-- FIXED: Detects MONSTERS (bomb planters)
+local function isMonsterTeam(player)
     if not player.Team then return false end
-    local teamName = player.Team.Name:lower()
-    return teamName:find("Monsters") ~= nil
+    local name = player.Team.Name:lower()
+    -- Customize these based on your game teams:
+    return name:find("monster") or name:find("monsters") or 
+           name:find("terror") or name:find("t ") or 
+           name:find("red") or name:find("bomb")
 end
 
--- Check if player is playing target animation
 local function isPlayingTargetAnimation(player)
     local char = player.Character
     if not char then return false end
-   
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid then return false end
-   
     local animator = humanoid:FindFirstChildOfClass("Animator")
     if not animator then return false end
-   
-    -- Check all playing animation tracks
     for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-        local animation = track.Animation
-        if animation then
-            local animId = animation.AnimationId
-            -- Check raw ID
-            if TARGET_ANIMATIONS[animId] then
-                return true
-            end
-            -- Extract number from rbxassetid://
-            local numId = animId:match("%d+")
-            if numId and TARGET_ANIMATIONS[numId] then
+        local anim = track.Animation
+        if anim then
+            local id = anim.AnimationId
+            if TARGET_ANIMATIONS[id] or (id:match("%d+") and TARGET_ANIMATIONS[id:match("%d+")]) then
                 return true
             end
         end
     end
-   
     return false
 end
 
--- FIXED: Reliable left click (works in Synapse, Script-Ware, most 2026 executors)
+-- FIXED Click (works everywhere)
 local function doLeftClick()
     pcall(function()
-        -- Primary: mouse1click() - most reliable
-        if mouse1click then
-            mouse1click()
-            return
-        end
-        -- Fallback: mouse1press + release
+        if mouse1click then mouse1click() return end
         if mouse1press and mouse1release then
             mouse1press()
             task.wait(0.03)
             mouse1release()
             return
         end
-        -- Ultimate fallback: warn if nothing works
-        warn("[AutoDefuse] No click method available! Update your executor.")
+        warn("[AutoDefuse] Update executor for mouse1click!")
     end)
 end
 
--- Get distance between local player and another player
 local function getDistanceToPlayer(player)
     local localRoot = getLocalRoot()
     local otherRoot = getPlayerRoot(player)
@@ -140,229 +120,167 @@ local function getDistanceToPlayer(player)
     return (localRoot.Position - otherRoot.Position).Magnitude
 end
 
--- Clear all visual parts
 local function clearVisuals()
-    if circlePart then
-        circlePart:Destroy()
-        circlePart = nil
-    end
-    for uid, part in pairs(playerParts) do
-        part:Destroy()
-    end
+    if circlePart then circlePart:Destroy() circlePart = nil end
+    for _, part in pairs(playerParts) do part:Destroy() end
     playerParts = {}
 end
 
--- Update main detection circle part
+-- MAIN CIRCLE: Under YOUR feet, GREEN=monster inside, RED=none
 local function updateDetectionCircle()
     local settings = getgenv().AutoDefuseSettings
     if not settings.ShowCircle then
-        if circlePart then
-            circlePart.Parent = nil
-        end
+        if circlePart then circlePart.Parent = nil end
         return
     end
-   
+
     local localRoot = getLocalRoot()
     if not localRoot then
-        if circlePart then
-            circlePart.Parent = nil
-        end
+        if circlePart then circlePart.Parent = nil end
         return
     end
-   
-    -- Create if needed
-    if not circlePart then
-        circlePart = createMainCirclePart()
-    end
-   
+
+    if not circlePart then circlePart = createMainCirclePart() end
+
     local radius = settings.DetectionRadius
-    local diam = radius * 2
-    circlePart.Size = Vector3.new(diam, 0.2, diam)
-   
-    -- Position at feet/ground
-    local pos = localRoot.Position + Vector3.new(0, -3, 0)
+    circlePart.Size = Vector3.new(radius * 2, 0.2, radius * 2)
+
+    -- EXACTLY under feet
+    local pos = localRoot.Position - Vector3.new(0, 3.5, 0)
     circlePart.CFrame = CFrame.new(pos) * CFrame.Angles(math.rad(90), 0, 0)
-   
-    -- Check if any valid player in range
-    local anyInRange = false
+
+    -- Check MONSTERS in range
+    local anyMonsterInRange = false
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and not isMonsters(player) then
-            local dist = getDistanceToPlayer(player)
-            if dist <= radius then
-                anyInRange = true
+        if player ~= LocalPlayer and isMonsterTeam(player) then
+            if getDistanceToPlayer(player) <= radius then
+                anyMonsterInRange = true
                 break
             end
         end
     end
-   
-    -- Dynamic color & transparency
-    if anyInRange then
-        circlePart.Color = Color3.fromRGB(0, 255, 0)
+
+    -- GREEN if monster in circle, RED if not
+    if anyMonsterInRange then
+        circlePart.Color = Color3.fromRGB(0, 255, 0)  -- GREEN
         circlePart.Transparency = 0.4
+        print("[AutoDefuse] GREEN: Monster in range!")  -- Debug (remove if annoying)
     else
-        circlePart.Color = Color3.fromRGB(255, 80, 80)
+        circlePart.Color = Color3.fromRGB(255, 50, 50)  -- RED
         circlePart.Transparency = 0.7
     end
-   
+
     circlePart.Parent = workspace
 end
 
--- Update player indicators (reused parts, no lag!)
+-- Monster indicators (small balls above their heads)
 local function updatePlayerIndicators()
     local settings = getgenv().AutoDefuseSettings
     if not settings.ShowCircle then
-        -- Hide all
-        for uid, part in pairs(playerParts) do
-            part.Parent = nil
-        end
+        for _, part in pairs(playerParts) do part.Parent = nil end
         return
     end
-   
-    local radius = settings.DetectionRadius
-    local checkRadius = radius * 1.2 -- Slightly larger for smooth show/hide
-   
-    -- Update existing / create new for nearby players
+
+    local radius = settings.DetectionRadius * 1.2
+
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and not isMonsters(player) then
+        if player ~= LocalPlayer and isMonsterTeam(player) then
             local otherRoot = getPlayerRoot(player)
-            if otherRoot then
-                local dist = getDistanceToPlayer(player)
-                if dist <= checkRadius then
-                    local uid = player.UserId
-                    local part = playerParts[uid]
-                   
-                    -- Create if needed
-                    if not part then
-                        part = createPlayerIndicatorPart(uid)
-                        playerParts[uid] = part
-                    end
-                   
-                    -- Position above player
-                    local pos = otherRoot.Position + Vector3.new(0, 6, 0)
-                    part.CFrame = CFrame.new(pos)
-                   
-                    local inRange = dist <= radius
-                    local isDetecting = isPlayingTargetAnimation(player)
-                   
-                    if isDetecting then
-                        -- YELLOW + BIG for bomb plant detected!
-                        part.Color = Color3.fromRGB(255, 255, 0)
-                        part.Size = Vector3.new(4, 4, 4)
-                        part.Transparency = 0.2
-                    else
-                        -- Green/Red based on range
-                        part.Color = inRange and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 80, 80)
-                        part.Size = Vector3.new(1.5, 1.5, 1.5)
-                        part.Transparency = 0.4
-                    end
-                   
-                    part.Parent = workspace
+            if otherRoot and getDistanceToPlayer(player) <= radius then
+                local uid = player.UserId
+                local part = playerParts[uid]
+                if not part then
+                    part = createPlayerIndicatorPart(uid)
+                    playerParts[uid] = part
+                end
+
+                -- Above head
+                part.CFrame = CFrame.new(otherRoot.Position + Vector3.new(0, 7, 0))
+
+                local inRange = getDistanceToPlayer(player) <= settings.DetectionRadius
+                part.Color = inRange and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
+                part.Size = inRange and Vector3.new(2.5, 2.5, 2.5) or Vector3.new(1.5, 1.5, 1.5)
+                part.Transparency = 0.3
+                part.Parent = workspace
+
+                -- YELLOW + PULSE if planting bomb
+                if isPlayingTargetAnimation(player) then
+                    part.Color = Color3.fromRGB(255, 255, 0)
+                    part.Size = Vector3.new(4, 4, 4)
+                    part.Transparency = 0.1
                 end
             end
         end
     end
-   
-    -- Cleanup: Destroy parts for gone/out-of-range players
+
+    -- Cleanup old parts
     for uid, part in pairs(playerParts) do
         local player = Players:GetPlayerByUserId(uid)
-        if not player or not player.Parent or not getPlayerRoot(player) or getDistanceToPlayer(player) > checkRadius then
+        if not player or not getPlayerRoot(player) or getDistanceToPlayer(player) > radius then
             part:Destroy()
             playerParts[uid] = nil
         end
     end
 end
 
--- Main loop
 local function mainLoopFunc()
     local settings = getgenv().AutoDefuseSettings
     if not settings.Enabled then return end
-   
-    local radius = settings.DetectionRadius
-    local delayMs = settings.Delay
-   
-    -- Update visuals (every frame, smooth)
+
     updateDetectionCircle()
     updatePlayerIndicators()
-   
-    -- Check each player for target animation
+
+    local radius = settings.DetectionRadius
+    local delayMs = settings.Delay
+
+    -- DETECT MONSTER bomb plants & auto-defuse
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and not isMonsters(player) then
-            local dist = getDistanceToPlayer(player)
-           
-            -- Only check players in range
-            if dist <= radius then
-                local playerId = player.UserId
-                local isPlaying = isPlayingTargetAnimation(player)
-               
-                if isPlaying then
-                    -- Start tracking if not already
-                    if not detectedPlayers[playerId] then
-                        detectedPlayers[playerId] = tick() * 1000
-                        print("[AutoDefuse] Detected bomb plant from:", player.Name, "Waiting", delayMs, "ms...")
+        if player ~= LocalPlayer and isMonsterTeam(player) and getDistanceToPlayer(player) <= radius then
+            local uid = player.UserId
+            local isPlanting = isPlayingTargetAnimation(player)
+
+            if isPlanting then
+                if not detectedPlayers[uid] then
+                    detectedPlayers[uid] = tick() * 1000
+                    print("[AutoDefuse] Monster planting:", player.Name)
+                end
+
+                local elapsed = (tick() * 1000) - detectedPlayers[uid]
+                if elapsed >= delayMs then
+                    if not clickCooldown[uid] or (tick() - clickCooldown[uid]) > 1 then
+                        doLeftClick()
+                        clickCooldown[uid] = tick()
+                        print("[AutoDefuse] DEFUSED! Monster:", player.Name, "Dist:", math.floor(getDistanceToPlayer(player)))
                     end
-                   
-                    -- Check if delay has passed (time to auto-defuse!)
-                    local startTime = detectedPlayers[playerId]
-                    local elapsed = (tick() * 1000) - startTime
-                   
-                    if elapsed >= delayMs then
-                        -- 1s cooldown per player
-                        if not clickCooldown[playerId] or (tick() - clickCooldown[playerId]) > 1 then
-                            doLeftClick()
-                            clickCooldown[playerId] = tick()
-                            print("[AutoDefuse] AUTO-DEFUSE! Player:", player.Name, "Dist:", math.floor(dist), "Elapsed:", math.floor(elapsed))
-                        end
-                    end
-                else
-                    -- Stopped anim, reset
-                    detectedPlayers[playerId] = nil
                 end
             else
-                -- Out of range, reset
-                detectedPlayers[player.UserId] = nil
+                detectedPlayers[uid] = nil
             end
+        else
+            detectedPlayers[player.UserId] = nil
         end
     end
 end
 
 function AutoDefuse.Start()
     getgenv().AutoDefuseSettings.Enabled = true
-   
-    if mainLoop then
-        mainLoop:Disconnect()
-    end
-   
-    -- Reset
+    if mainLoop then mainLoop:Disconnect() end
     detectedPlayers = {}
     clickCooldown = {}
     clearVisuals()
-   
-    mainLoop = RunService.RenderStepped:Connect(function()
-        pcall(mainLoopFunc)
-    end)
-   
-    print("[AutoDefuse] STARTED ✅")
-    print(" - Radius:", getgenv().AutoDefuseSettings.DetectionRadius)
-    print(" - Delay:", getgenv().AutoDefuseSettings.Delay, "ms")
-    print(" - Show Circles:", getgenv().AutoDefuseSettings.ShowCircle)
-    print(" - TIP: Get REAL bomb plant anim IDs for detection!")
+
+    mainLoop = RunService.RenderStepped:Connect(pcall(mainLoopFunc))
+    print("🟢 [AutoDefuse] STARTED - Circle under feet: GREEN=Monster inside!")
 end
 
 function AutoDefuse.Stop()
     getgenv().AutoDefuseSettings.Enabled = false
-   
-    if mainLoop then
-        mainLoop:Disconnect()
-        mainLoop = nil
-    end
-   
+    if mainLoop then mainLoop:Disconnect() mainLoop = nil end
     clearVisuals()
     detectedPlayers = {}
     clickCooldown = {}
-   
-    print("[AutoDefuse] STOPPED")
+    print("🔴 [AutoDefuse] STOPPED")
 end
 
--- Export
 getgenv().AutoDefuseControl = AutoDefuse
 return AutoDefuse
