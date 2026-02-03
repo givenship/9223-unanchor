@@ -1,6 +1,6 @@
 -- Player Module (Fixed)
--- Features: Reset Character, Lock Jumppower, Noclip, Invisible
--- FIX: Invisible Y offset now uses positive value after reset
+-- Features: Reset Character, Lock Jumppower, Noclip, RemoveThisShit
+-- FIX: RemoveThisShit Y offset now uses positive value after reset
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -311,7 +311,7 @@ function PlayerModule.CreateUI(parent)
     
     yPos = yPos + 10
     
-    -- INVISIBLE Section
+    -- RemoveThisShit Section
     local invisTitle = Instance.new("TextLabel")
     invisTitle.Size = UDim2.new(1, -20, 0, 30)
     invisTitle.Position = UDim2.new(0, 10, 0, yPos)
@@ -324,9 +324,9 @@ function PlayerModule.CreateUI(parent)
     invisTitle.Parent = playerContent
     yPos = yPos + 40
     
-    yPos = createToggleButton("Invisible", getgenv().PlayerSettings, "Invisible", yPos, toggleInvisible)
+    yPos = createToggleButton("RemoveThisShit", getgenv().PlayerSettings, "RemoveThisShit", yPos, toggleRemoveThisShit)
     -- FIX: Y Offset slider now shows positive values (1-10)
-    yPos = createSlider("Y Offset", getgenv().PlayerSettings, "InvisibleYOffset", 1, 10, yPos)
+    yPos = createSlider("Y Offset", getgenv().PlayerSettings, "RemoveThisShitYOffset", 1, 10, yPos)
     yPos = createCheckbox("Keep On Ground", getgenv().PlayerSettings, "KeepOnGround", yPos)
     
     local invisNote = Instance.new("TextLabel")
