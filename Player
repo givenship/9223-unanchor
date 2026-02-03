@@ -20,15 +20,6 @@ getgenv().PlayerSettings = {
     Noclip = false,
 }
 
--- Connections
-local jumppowerConnection = nil
-local noclipConnection = nil
-local invisibleConnection = nil
-local carpetAnim = nil
-local carpet = nil
-local carpetLoop = nil
-local carpetDied = nil
-
 local function isR15(character)
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return false end
