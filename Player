@@ -18,9 +18,6 @@ getgenv().PlayerSettings = {
     LockJumppower = false,
     JumppowerValue = 50,
     Noclip = false,
-    Invisible = false,
-    InvisibleYOffset = 2, -- Y offset for invisible (POSITIVE value now)
-    KeepOnGround = false
 }
 
 -- Connections
