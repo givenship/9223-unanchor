@@ -2,7 +2,7 @@
 -- Features: Reset Character, Lock Jumppower, Noclip, Invisible
 -- FIX: Invisible Y offset now uses positive value after reset
 
-print("v1")
+print("v1")jnjhghjhgnhtrrt
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
