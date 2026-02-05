@@ -1,3 +1,6 @@
+-- Euva FollowerCheck
+-- Step 1: Check if player follows Euvanoa, then load ConnectScript
+
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local StarterGui = game:GetService("StarterGui")
@@ -5,9 +8,9 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Configuration
-local TARGET_USER_ID = 10443769536 -- Replace with Euvanoa's actual UserId
+local TARGET_USER_ID = 0 -- Replace with Euvanoa's actual UserId
 local DISCORD_INVITE = "https://discord.gg/QenEpRVGpd"
-local CONNECT_SCRIPT_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/AuxiliaryAuthorize"
+local CONNECT_SCRIPT_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/ConnectScript"
 
 -- ============================================
 -- CHECK IF PLAYER FOLLOWS EUVANOA
@@ -91,7 +94,7 @@ local function showUnauthorizedGUI()
     midText.Size = UDim2.new(1, -40, 0, 50)
     midText.Position = UDim2.new(0, 20, 0, 60)
     midText.BackgroundTransparency = 1
-    midText.Text = 'How to Get authorized?\nFollow The User "Euvanoa" in Roblox Rejoin after Followed.'
+    midText.Text = 'How to Get authorized?\nFollow The User "Euvanoa" in Roblox.'
     midText.Font = Enum.Font.Arial
     midText.TextSize = 14
     midText.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -141,7 +144,7 @@ local function showUnauthorizedGUI()
     bottomText.Size = UDim2.new(1, -40, 0, 40)
     bottomText.Position = UDim2.new(0, 20, 0, 162)
     bottomText.BackgroundTransparency = 1
-    bottomText.Text = "If you followed and Rejoined still not solved yet, wait 5 minutes or Contact Discord."
+    bottomText.Text = "If you follow The User and still not solved yet, wait 5 minutes or Contact Discord."
     bottomText.Font = Enum.Font.Arial
     bottomText.TextSize = 12
     bottomText.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -173,7 +176,7 @@ local isFollowing = checkFollowing()
 
 if isFollowing then
     print("[Euva] Authorized - Loading ConnectScript...")
-    loadstring(game:HttpGet(https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/AuxiliaryAuthorize))()
+    loadstring(game:HttpGet(CONNECT_SCRIPT_URL))()
 else
     showUnauthorizedGUI()
     warn("[Euva] Not authorized - Must follow Euvanoa")
