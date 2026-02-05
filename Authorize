@@ -1,6 +1,3 @@
--- Euva FollowerCheck
--- Step 1: Check if player follows Euvanoa, then load ConnectScript
-
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local StarterGui = game:GetService("StarterGui")
