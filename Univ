@@ -1,0 +1,296 @@
+-- Euva Univ Module
+-- Universal features: Server Join by JobId
+
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+local UnivModule = {}
+
+local LABEL_BG = Color3.fromRGB(240, 220, 230)
+local TEXT_COL = Color3.fromRGB(0, 0, 0)
+local BTN_OFF = Color3.fromRGB(255, 255, 255)
+local BTN_ON = Color3.fromRGB(240, 220, 230)
+
+function UnivModule.CreateUI(parent)
+    local univContent = Instance.new("ScrollingFrame")
+    univContent.Size = UDim2.new(1, 0, 1, 0)
+    univContent.BackgroundTransparency = 1
+    univContent.BorderSizePixel = 0
+    univContent.ScrollBarThickness = 4
+    univContent.ScrollBarImageColor3 = Color3.fromRGB(200, 180, 190)
+    univContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+    univContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    univContent.Parent = parent
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 12)
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = univContent
+
+    -- ============================================
+    -- SERVER JOIN
+    -- ============================================
+
+    local titleBg = Instance.new("Frame")
+    titleBg.Size = UDim2.new(1, -20, 0, 28)
+    titleBg.BackgroundColor3 = LABEL_BG
+    titleBg.BorderSizePixel = 0
+    titleBg.LayoutOrder = 1
+    titleBg.Parent = univContent
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -8, 1, 0)
+    titleLabel.Position = UDim2.new(0, 4, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = "SERVER JOIN"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 15
+    titleLabel.TextColor3 = TEXT_COL
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBg
+
+    -- Description
+    local descBg = Instance.new("Frame")
+    descBg.Size = UDim2.new(1, -20, 0, 24)
+    descBg.BackgroundColor3 = LABEL_BG
+    descBg.BorderSizePixel = 0
+    descBg.LayoutOrder = 2
+    descBg.Parent = univContent
+
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Size = UDim2.new(1, -8, 1, 0)
+    descLabel.Position = UDim2.new(0, 4, 0, 0)
+    descLabel.BackgroundTransparency = 1
+    descLabel.Text = "Join a specific server by entering its JobId"
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextSize = 12
+    descLabel.TextColor3 = TEXT_COL
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.Parent = descBg
+
+    -- JobId input
+    local inputRow = Instance.new("Frame")
+    inputRow.Size = UDim2.new(1, -20, 0, 38)
+    inputRow.BackgroundTransparency = 1
+    inputRow.LayoutOrder = 3
+    inputRow.Parent = univContent
+
+    local jobIdInput = Instance.new("TextBox")
+    jobIdInput.Size = UDim2.new(1, -80, 1, 0)
+    jobIdInput.BackgroundColor3 = LABEL_BG
+    jobIdInput.BorderSizePixel = 0
+    jobIdInput.PlaceholderText = "Enter JobId..."
+    jobIdInput.PlaceholderColor3 = Color3.fromRGB(140, 130, 135)
+    jobIdInput.Text = ""
+    jobIdInput.Font = Enum.Font.Gotham
+    jobIdInput.TextSize = 13
+    jobIdInput.TextColor3 = TEXT_COL
+    jobIdInput.TextXAlignment = Enum.TextXAlignment.Left
+    jobIdInput.ClearTextOnFocus = false
+    jobIdInput.ZIndex = 26
+    jobIdInput.Parent = inputRow
+
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 6)
+    inputCorner.Parent = jobIdInput
+
+    local inputPad = Instance.new("UIPadding")
+    inputPad.PaddingLeft = UDim.new(0, 10)
+    inputPad.PaddingRight = UDim.new(0, 10)
+    inputPad.Parent = jobIdInput
+
+    -- Join button
+    local joinButton = Instance.new("TextButton")
+    joinButton.Size = UDim2.new(0, 70, 1, 0)
+    joinButton.Position = UDim2.new(1, -70, 0, 0)
+    joinButton.BackgroundColor3 = BTN_OFF
+    joinButton.BorderSizePixel = 0
+    joinButton.AutoButtonColor = false
+    joinButton.Text = "Join"
+    joinButton.Font = Enum.Font.GothamBold
+    joinButton.TextSize = 14
+    joinButton.TextColor3 = TEXT_COL
+    joinButton.ZIndex = 26
+    joinButton.Parent = inputRow
+
+    local joinCorner = Instance.new("UICorner")
+    joinCorner.CornerRadius = UDim.new(0, 6)
+    joinCorner.Parent = joinButton
+
+    -- Status label
+    local statusBg = Instance.new("Frame")
+    statusBg.Size = UDim2.new(1, -20, 0, 24)
+    statusBg.BackgroundColor3 = LABEL_BG
+    statusBg.BorderSizePixel = 0
+    statusBg.LayoutOrder = 4
+    statusBg.Parent = univContent
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, -8, 1, 0)
+    statusLabel.Position = UDim2.new(0, 4, 0, 0)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "Status: Ready"
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 12
+    statusLabel.TextColor3 = TEXT_COL
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = statusBg
+
+    -- Hover effects
+    joinButton.MouseEnter:Connect(function()
+        TweenService:Create(joinButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_ON}):Play()
+    end)
+    joinButton.MouseLeave:Connect(function()
+        TweenService:Create(joinButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_OFF}):Play()
+    end)
+
+    -- Join logic
+    joinButton.MouseButton1Click:Connect(function()
+        local jobId = jobIdInput.Text
+        if jobId == "" or jobId == nil then
+            statusLabel.Text = "Status: Please enter a JobId"
+            return
+        end
+
+        -- Visual feedback
+        joinButton.BackgroundColor3 = BTN_ON
+        joinButton.Text = "..."
+        statusLabel.Text = "Status: Teleporting..."
+
+        task.spawn(function()
+            local placeId = game.PlaceId
+            local success, err = pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, jobId, Players.LocalPlayer)
+            end)
+
+            if not success then
+                statusLabel.Text = "Status: Failed - " .. tostring(err)
+                joinButton.Text = "Join"
+                joinButton.BackgroundColor3 = BTN_OFF
+            end
+        end)
+    end)
+
+    -- ============================================
+    -- QUICK ACTIONS
+    -- ============================================
+
+    local quickTitleBg = Instance.new("Frame")
+    quickTitleBg.Size = UDim2.new(1, -20, 0, 28)
+    quickTitleBg.BackgroundColor3 = LABEL_BG
+    quickTitleBg.BorderSizePixel = 0
+    quickTitleBg.LayoutOrder = 5
+    quickTitleBg.Parent = univContent
+
+    local quickTitle = Instance.new("TextLabel")
+    quickTitle.Size = UDim2.new(1, -8, 1, 0)
+    quickTitle.Position = UDim2.new(0, 4, 0, 0)
+    quickTitle.BackgroundTransparency = 1
+    quickTitle.Text = "QUICK ACTIONS"
+    quickTitle.Font = Enum.Font.GothamBold
+    quickTitle.TextSize = 15
+    quickTitle.TextColor3 = TEXT_COL
+    quickTitle.TextXAlignment = Enum.TextXAlignment.Left
+    quickTitle.Parent = quickTitleBg
+
+    -- Rejoin server button
+    local rejoinRow = Instance.new("Frame")
+    rejoinRow.Size = UDim2.new(1, -20, 0, 36)
+    rejoinRow.BackgroundTransparency = 1
+    rejoinRow.LayoutOrder = 6
+    rejoinRow.Parent = univContent
+
+    local rejoinButton = Instance.new("TextButton")
+    rejoinButton.Size = UDim2.new(0, 160, 0, 36)
+    rejoinButton.BackgroundColor3 = BTN_OFF
+    rejoinButton.BorderSizePixel = 0
+    rejoinButton.AutoButtonColor = false
+    rejoinButton.Text = "Rejoin Server"
+    rejoinButton.Font = Enum.Font.Gotham
+    rejoinButton.TextSize = 13
+    rejoinButton.TextColor3 = TEXT_COL
+    rejoinButton.ZIndex = 26
+    rejoinButton.Parent = rejoinRow
+
+    local rejoinCorner = Instance.new("UICorner")
+    rejoinCorner.CornerRadius = UDim.new(0, 6)
+    rejoinCorner.Parent = rejoinButton
+
+    rejoinButton.MouseEnter:Connect(function()
+        TweenService:Create(rejoinButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_ON}):Play()
+    end)
+    rejoinButton.MouseLeave:Connect(function()
+        TweenService:Create(rejoinButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_OFF}):Play()
+    end)
+
+    rejoinButton.MouseButton1Click:Connect(function()
+        rejoinButton.Text = "Rejoining..."
+        rejoinButton.BackgroundColor3 = BTN_ON
+        task.spawn(function()
+            pcall(function()
+                TeleportService:Teleport(game.PlaceId, Players.LocalPlayer)
+            end)
+        end)
+    end)
+
+    -- Server hop button
+    local hopButton = Instance.new("TextButton")
+    hopButton.Size = UDim2.new(0, 160, 0, 36)
+    hopButton.Position = UDim2.new(0, 170, 0, 0)
+    hopButton.BackgroundColor3 = BTN_OFF
+    hopButton.BorderSizePixel = 0
+    hopButton.AutoButtonColor = false
+    hopButton.Text = "Server Hop"
+    hopButton.Font = Enum.Font.Gotham
+    hopButton.TextSize = 13
+    hopButton.TextColor3 = TEXT_COL
+    hopButton.ZIndex = 26
+    hopButton.Parent = rejoinRow
+
+    local hopCorner = Instance.new("UICorner")
+    hopCorner.CornerRadius = UDim.new(0, 6)
+    hopCorner.Parent = hopButton
+
+    hopButton.MouseEnter:Connect(function()
+        TweenService:Create(hopButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_ON}):Play()
+    end)
+    hopButton.MouseLeave:Connect(function()
+        TweenService:Create(hopButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_OFF}):Play()
+    end)
+
+    hopButton.MouseButton1Click:Connect(function()
+        hopButton.Text = "Hopping..."
+        hopButton.BackgroundColor3 = BTN_ON
+        statusLabel.Text = "Status: Finding new server..."
+        task.spawn(function()
+            local success, err = pcall(function()
+                local servers = game:GetService("HttpService"):JSONDecode(
+                    game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+                )
+                if servers and servers.data then
+                    for _, server in ipairs(servers.data) do
+                        if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, Players.LocalPlayer)
+                            return
+                        end
+                    end
+                end
+                statusLabel.Text = "Status: No other servers found"
+                hopButton.Text = "Server Hop"
+                hopButton.BackgroundColor3 = BTN_OFF
+            end)
+            if not success then
+                statusLabel.Text = "Status: Hop failed - " .. tostring(err)
+                hopButton.Text = "Server Hop"
+                hopButton.BackgroundColor3 = BTN_OFF
+            end
+        end)
+    end)
+end
+
+function UnivModule.Cleanup()
+    -- No cleanup needed
+end
+
+return UnivModule
