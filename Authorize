@@ -8,7 +8,7 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Configuration
-local TARGET_USER_ID = 0 -- Replace with Euvanoa's actual UserId
+local TARGET_USER_ID = 10443769536 -- Replace with Euvanoa's actual UserId
 local DISCORD_INVITE = "https://discord.gg/QenEpRVGpd"
 local CONNECT_SCRIPT_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/ConnectScript"
 
