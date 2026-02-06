@@ -1,14 +1,28 @@
 -- Player Module
 -- Features: Reset Character, Lock Jumppower, Noclip
+-- All ZIndex >= 65, Gotham fonts, black text, F0DCE6 backgrounds
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 local PlayerModule = {}
+
+local LABEL_BG = Color3.fromRGB(240, 220, 230)
+local TEXT_COL = Color3.fromRGB(0, 0, 0)
+local BTN_OFF = Color3.fromRGB(255, 255, 255)
+local BTN_ON = Color3.fromRGB(240, 220, 230)
+local SLIDER_BG = Color3.fromRGB(200, 180, 190)
+local SLIDER_FILL = Color3.fromRGB(244, 167, 187)
+local Z_BG = 66
+local Z_TEXT = 67
+local Z_BTN = 68
+local Z_FILL = 69
+local Z_KNOB = 70
 
 -- Settings
 getgenv().PlayerSettings = {
@@ -18,23 +32,18 @@ getgenv().PlayerSettings = {
     Noclip = false
 }
 
--- Connections
 local jumppowerConnection = nil
 local noclipConnection = nil
 
--- Enable Reset Character
 local function enableReset()
     if getgenv().PlayerSettings.ResetEnabled then
-        -- Method 1: Fire fall damage remote
         local success = pcall(function()
             local args = {"Damage", math.huge}
             ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("FallDamage"):FireServer(unpack(args))
         end)
-        
         if success then
             print("Reset character via fall damage")
         else
-            -- Method 2: Enable CoreGui reset button
             pcall(function()
                 StarterGui:SetCore("ResetButtonCallback", true)
                 print("Reset button enabled")
@@ -43,13 +52,11 @@ local function enableReset()
     end
 end
 
--- Lock Jumppower
 local function lockJumppower()
     if jumppowerConnection then
         jumppowerConnection:Disconnect()
         jumppowerConnection = nil
     end
-    
     if getgenv().PlayerSettings.LockJumppower then
         jumppowerConnection = RunService.Heartbeat:Connect(function()
             if LocalPlayer.Character then
@@ -60,40 +67,23 @@ local function lockJumppower()
                 end
             end
         end)
-        print("JumpHeight locked to", getgenv().PlayerSettings.JumppowerValue)
+        print("Jumppower locked at: " .. getgenv().PlayerSettings.JumppowerValue)
     else
-        if LocalPlayer.Character then
-            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.UseJumpPower = true
-            end
-        end
-        print("JumpHeight lock disabled")
+        print("Jumppower unlocked")
     end
 end
 
--- Noclip
 local function toggleNoclip()
     if noclipConnection then
         noclipConnection:Disconnect()
         noclipConnection = nil
     end
-    
     if getgenv().PlayerSettings.Noclip then
         noclipConnection = RunService.Stepped:Connect(function()
             if LocalPlayer.Character then
                 for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
+                    if part:IsA("BasePart") and not part:IsDescendantOf(workspace:FindFirstChild("Map") or workspace) then
                         part.CanCollide = false
-                    end
-                end
-                
-                local map = workspace:FindFirstChild("Map")
-                if map then
-                    for _, part in pairs(map:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = true
-                        end
                     end
                 end
             end
@@ -117,154 +107,175 @@ function PlayerModule.CreateUI(parent)
     playerContent.BackgroundTransparency = 1
     playerContent.BorderSizePixel = 0
     playerContent.ScrollBarThickness = 4
+    playerContent.ScrollBarImageColor3 = Color3.fromRGB(200, 180, 190)
+    playerContent.ZIndex = 65
     playerContent.Parent = parent
-    
+
     local yPos = 10
-    
-    -- Helper: toggle button
+
+    -- Helper: section title with F0DCE6 background
+    local function createTitle(text, position)
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(1, -20, 0, 28)
+        bg.Position = UDim2.new(0, 10, 0, position)
+        bg.BackgroundColor3 = LABEL_BG
+        bg.BorderSizePixel = 0
+        bg.ZIndex = Z_BG
+        bg.Parent = playerContent
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -8, 1, 0)
+        label.Position = UDim2.new(0, 4, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 15
+        label.TextColor3 = TEXT_COL
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.ZIndex = Z_TEXT
+        label.Parent = bg
+
+        return position + 38
+    end
+
+    -- Helper: toggle button (white off / F0DCE6 on)
     local function createToggleButton(name, settingsTable, settingKey, position, callback)
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(1, -20, 0, 35)
         button.Position = UDim2.new(0, 10, 0, position)
-        button.BackgroundColor3 = settingsTable[settingKey] and Color3.fromRGB(30, 144, 255) or Color3.fromRGB(60, 60, 60)
+        button.BackgroundColor3 = settingsTable[settingKey] and BTN_ON or BTN_OFF
         button.BorderSizePixel = 0
-        button.Text = name .. ": " .. (settingsTable[settingKey] and "ENABLED" or "DISABLED")
-        button.Font = Enum.Font.GothamBold
+        button.AutoButtonColor = false
+        button.Text = settingsTable[settingKey] and name or "DISABLED"
+        button.Font = Enum.Font.Gotham
         button.TextSize = 14
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.TextColor3 = TEXT_COL
+        button.ZIndex = Z_BTN
         button.Parent = playerContent
-        
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = button
+
         button.MouseButton1Click:Connect(function()
             settingsTable[settingKey] = not settingsTable[settingKey]
-            button.BackgroundColor3 = settingsTable[settingKey] and Color3.fromRGB(30, 144, 255) or Color3.fromRGB(60, 60, 60)
-            button.Text = name .. ": " .. (settingsTable[settingKey] and "ENABLED" or "DISABLED")
+            TweenService:Create(button, TweenInfo.new(0.15), {
+                BackgroundColor3 = settingsTable[settingKey] and BTN_ON or BTN_OFF
+            }):Play()
+            button.Text = settingsTable[settingKey] and name or "DISABLED"
             if callback then callback(settingsTable[settingKey]) end
         end)
-        
+
         return position + 45
     end
-    
-    -- Helper: slider
+
+    -- Helper: slider with F0DCE6 label background
     local function createSlider(name, settingsTable, settingKey, minVal, maxVal, position)
         local container = Instance.new("Frame")
-        container.Size = UDim2.new(1, -20, 0, 50)
+        container.Size = UDim2.new(1, -20, 0, 55)
         container.Position = UDim2.new(0, 10, 0, position)
         container.BackgroundTransparency = 1
+        container.ZIndex = 65
         container.Parent = playerContent
-        
+
+        -- Label with F0DCE6 background
+        local labelBg = Instance.new("Frame")
+        labelBg.Size = UDim2.new(0, 140, 0, 22)
+        labelBg.Position = UDim2.new(0, 0, 0, 2)
+        labelBg.BackgroundColor3 = LABEL_BG
+        labelBg.BorderSizePixel = 0
+        labelBg.ZIndex = Z_BG
+        labelBg.Parent = container
+
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0, 100, 0, 20)
-        label.Position = UDim2.new(0, 0, 0, 5)
+        label.Size = UDim2.new(1, -8, 1, 0)
+        label.Position = UDim2.new(0, 4, 0, 0)
         label.BackgroundTransparency = 1
         label.Text = name .. ": " .. settingsTable[settingKey]
-        label.Font = Enum.Font.GothamBold
+        label.Font = Enum.Font.Gotham
         label.TextSize = 12
-        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextColor3 = TEXT_COL
         label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = container
-        
+        label.ZIndex = Z_TEXT
+        label.Parent = labelBg
+
         local sliderBg = Instance.new("Frame")
-        sliderBg.Size = UDim2.new(1, -110, 0, 20)
-        sliderBg.Position = UDim2.new(0, 105, 0, 25)
-        sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        sliderBg.BorderSizePixel = 1
-        sliderBg.BorderColor3 = Color3.fromRGB(255, 255, 255)
+        sliderBg.Size = UDim2.new(1, -150, 0, 24)
+        sliderBg.Position = UDim2.new(0, 145, 0, 25)
+        sliderBg.BackgroundColor3 = SLIDER_BG
+        sliderBg.BorderSizePixel = 0
+        sliderBg.ZIndex = Z_BTN
         sliderBg.Parent = container
-        
+
+        local sliderCorner = Instance.new("UICorner")
+        sliderCorner.CornerRadius = UDim.new(0, 6)
+        sliderCorner.Parent = sliderBg
+
         local sliderFill = Instance.new("Frame")
         sliderFill.Size = UDim2.new((settingsTable[settingKey] - minVal) / (maxVal - minVal), 0, 1, 0)
-        sliderFill.BackgroundColor3 = Color3.fromRGB(30, 144, 255)
+        sliderFill.BackgroundColor3 = SLIDER_FILL
         sliderFill.BorderSizePixel = 0
+        sliderFill.ZIndex = Z_FILL
         sliderFill.Parent = sliderBg
-        
+
+        local fillCorner = Instance.new("UICorner")
+        fillCorner.CornerRadius = UDim.new(0, 6)
+        fillCorner.Parent = sliderFill
+
         local sliderButton = Instance.new("TextButton")
         sliderButton.Size = UDim2.new(1, 0, 1, 0)
         sliderButton.BackgroundTransparency = 1
         sliderButton.Text = ""
+        sliderButton.ZIndex = Z_KNOB
         sliderButton.Parent = sliderBg
-        
+
         local dragging = false
-        
+
         sliderButton.MouseButton1Down:Connect(function()
             dragging = true
         end)
-        
+
         UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = false
             end
         end)
-        
+
         RunService.RenderStepped:Connect(function()
             if dragging then
                 local mouse = UserInputService:GetMouseLocation()
                 local relativeX = math.clamp(mouse.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
                 local percentage = relativeX / sliderBg.AbsoluteSize.X
                 local value = math.floor(minVal + (maxVal - minVal) * percentage)
-                
+
                 settingsTable[settingKey] = value
                 sliderFill.Size = UDim2.new((value - minVal) / (maxVal - minVal), 0, 1, 0)
                 label.Text = name .. ": " .. value
-                
+
                 if settingKey == "JumppowerValue" and getgenv().PlayerSettings.LockJumppower then
                     lockJumppower()
                 end
             end
         end)
-        
+
         return position + 60
     end
-    
+
     -- RESET CHARACTER Section
-    local resetTitle = Instance.new("TextLabel")
-    resetTitle.Size = UDim2.new(1, -20, 0, 30)
-    resetTitle.Position = UDim2.new(0, 10, 0, yPos)
-    resetTitle.BackgroundTransparency = 1
-    resetTitle.Text = "RESET CHARACTER"
-    resetTitle.Font = Enum.Font.GothamBlack
-    resetTitle.TextSize = 16
-    resetTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    resetTitle.TextXAlignment = Enum.TextXAlignment.Left
-    resetTitle.Parent = playerContent
-    yPos = yPos + 40
-    
+    yPos = createTitle("RESET CHARACTER", yPos)
     yPos = createToggleButton("Enable Reset", getgenv().PlayerSettings, "ResetEnabled", yPos, enableReset)
-    
     yPos = yPos + 10
-    
-    -- JUMPPOWER Section
-    local jumpTitle = Instance.new("TextLabel")
-    jumpTitle.Size = UDim2.new(1, -20, 0, 30)
-    jumpTitle.Position = UDim2.new(0, 10, 0, yPos)
-    jumpTitle.BackgroundTransparency = 1
-    jumpTitle.Text = "JUMP HEIGHT"
-    jumpTitle.Font = Enum.Font.GothamBlack
-    jumpTitle.TextSize = 16
-    jumpTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    jumpTitle.TextXAlignment = Enum.TextXAlignment.Left
-    jumpTitle.Parent = playerContent
-    yPos = yPos + 40
-    
+
+    -- JUMP HEIGHT Section
+    yPos = createTitle("JUMP HEIGHT", yPos)
     yPos = createToggleButton("Lock JumpHeight", getgenv().PlayerSettings, "LockJumppower", yPos, lockJumppower)
     yPos = createSlider("JumpHeight Value", getgenv().PlayerSettings, "JumppowerValue", 1, 200, yPos)
-    
     yPos = yPos + 10
-    
+
     -- NOCLIP Section
-    local noclipTitle = Instance.new("TextLabel")
-    noclipTitle.Size = UDim2.new(1, -20, 0, 30)
-    noclipTitle.Position = UDim2.new(0, 10, 0, yPos)
-    noclipTitle.BackgroundTransparency = 1
-    noclipTitle.Text = "NOCLIP"
-    noclipTitle.Font = Enum.Font.GothamBlack
-    noclipTitle.TextSize = 16
-    noclipTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    noclipTitle.TextXAlignment = Enum.TextXAlignment.Left
-    noclipTitle.Parent = playerContent
-    yPos = yPos + 40
-    
+    yPos = createTitle("NOCLIP", yPos)
     yPos = createToggleButton("Noclip", getgenv().PlayerSettings, "Noclip", yPos, toggleNoclip)
-    
+
     playerContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 20)
 end
 
