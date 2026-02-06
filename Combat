@@ -1,6 +1,8 @@
 -- Combat Module - Main GUI
 -- Loads Hitbox and Aimlock scripts from GitHub
 
+Print("is that dih good")
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -59,9 +61,10 @@ getgenv().AimlockSettings = {
 
 getgenv().AutoDefuseSettings = {
     Enabled = false,
-    Delay = 3000,
+    Delay = 0,
     ShowCircle = true,
-    DetectionRadius = 30
+    DetectionRadius = 30,
+    Method = "Animation"
 }
 
 local hitboxLoaded = false
@@ -631,29 +634,6 @@ function CombatModule.CreateUI(parent)
     -- AUTO DEFUSE
     yPos = createSectionTitle("AUTO DEFUSE", yPos)
 
-    -- Info label
-    local defuseInfoBg = Instance.new("Frame")
-    defuseInfoBg.Size = UDim2.new(0, 0, 0, 35)
-    defuseInfoBg.AutomaticSize = Enum.AutomaticSize.X
-    defuseInfoBg.Position = UDim2.new(0, 10, 0, yPos)
-    defuseInfoBg.BackgroundColor3 = TXT_BG
-    defuseInfoBg.BorderSizePixel = 0
-    defuseInfoBg.ZIndex = 66
-    defuseInfoBg.Parent = combatContent
-
-    local defuseInfo = Instance.new("TextLabel")
-    defuseInfo.Size = UDim2.new(0, 250, 1, 0)
-    defuseInfo.BackgroundTransparency = 1
-    defuseInfo.Text = "Detects Monsters team bomb animation\nthen auto-clicks to defuse"
-    defuseInfo.Font = Enum.Font.Gotham
-    defuseInfo.TextSize = 11
-    defuseInfo.TextColor3 = TEXT_COL
-    defuseInfo.TextXAlignment = Enum.TextXAlignment.Left
-    defuseInfo.TextWrapped = true
-    defuseInfo.ZIndex = 67
-    defuseInfo.Parent = defuseInfoBg
-    yPos = yPos + 40
-
     yPos = createToggleButton("Auto Defuse", getgenv().AutoDefuseSettings, "Enabled", yPos, function(enabled)
         if not autoDefuseLoaded then
             print("Loading Auto Defuse script from GitHub...")
@@ -672,6 +652,84 @@ function CombatModule.CreateUI(parent)
         end
         if enabled then getgenv().AutoDefuseControl.Start() else getgenv().AutoDefuseControl.Stop() end
     end)
+
+    -- Detection Method Toggle
+    local methodContainer = Instance.new("Frame")
+    methodContainer.Size = UDim2.new(1, -20, 0, 35)
+    methodContainer.Position = UDim2.new(0, 10, 0, yPos)
+    methodContainer.BackgroundTransparency = 1
+    methodContainer.ZIndex = 65
+    methodContainer.Parent = combatContent
+
+    local methodLabelBg = Instance.new("Frame")
+    methodLabelBg.Size = UDim2.new(0, 0, 0, 30)
+    methodLabelBg.AutomaticSize = Enum.AutomaticSize.X
+    methodLabelBg.Position = UDim2.new(0, 0, 0, 2)
+    methodLabelBg.BackgroundColor3 = TXT_BG
+    methodLabelBg.BorderSizePixel = 0
+    methodLabelBg.ZIndex = 66
+    methodLabelBg.Parent = methodContainer
+    addPadding(methodLabelBg, 6, 0)
+
+    local methodLabel = Instance.new("TextLabel")
+    methodLabel.Size = UDim2.new(0, 0, 1, 0)
+    methodLabel.AutomaticSize = Enum.AutomaticSize.X
+    methodLabel.BackgroundTransparency = 1
+    methodLabel.Text = "Method:"
+    methodLabel.Font = Enum.Font.Gotham
+    methodLabel.TextSize = 12
+    methodLabel.TextColor3 = TEXT_COL
+    methodLabel.TextXAlignment = Enum.TextXAlignment.Left
+    methodLabel.ZIndex = 67
+    methodLabel.Parent = methodLabelBg
+
+    local animBtn = Instance.new("TextButton")
+    animBtn.Size = UDim2.new(0, 80, 0, 30)
+    animBtn.Position = UDim2.new(1, -165, 0, 2)
+    animBtn.BackgroundColor3 = BTN_ON
+    animBtn.BorderSizePixel = 0
+    animBtn.Text = "Animation"
+    animBtn.Font = Enum.Font.GothamBold
+    animBtn.TextSize = 11
+    animBtn.TextColor3 = TEXT_COL
+    animBtn.AutoButtonColor = false
+    animBtn.ZIndex = 68
+    animBtn.Parent = methodContainer
+
+    local soundBtn = Instance.new("TextButton")
+    soundBtn.Size = UDim2.new(0, 80, 0, 30)
+    soundBtn.Position = UDim2.new(1, -80, 0, 2)
+    soundBtn.BackgroundColor3 = BTN_OFF
+    soundBtn.BorderSizePixel = 0
+    soundBtn.Text = "Sound"
+    soundBtn.Font = Enum.Font.GothamBold
+    soundBtn.TextSize = 11
+    soundBtn.TextColor3 = TEXT_COL
+    soundBtn.AutoButtonColor = false
+    soundBtn.ZIndex = 68
+    soundBtn.Parent = methodContainer
+
+    local function updateMethodButtons()
+        if getgenv().AutoDefuseSettings.Method == "Animation" then
+            animBtn.BackgroundColor3 = BTN_ON
+            soundBtn.BackgroundColor3 = BTN_OFF
+        else
+            animBtn.BackgroundColor3 = BTN_OFF
+            soundBtn.BackgroundColor3 = BTN_ON
+        end
+    end
+
+    animBtn.MouseButton1Click:Connect(function()
+        getgenv().AutoDefuseSettings.Method = "Animation"
+        updateMethodButtons()
+    end)
+
+    soundBtn.MouseButton1Click:Connect(function()
+        getgenv().AutoDefuseSettings.Method = "Sound"
+        updateMethodButtons()
+    end)
+
+    yPos = yPos + 42
 
     -- React Delay TextBox
     local delayContainer = Instance.new("Frame")
@@ -729,7 +787,7 @@ function CombatModule.CreateUI(parent)
         end
     end)
 
-    yPos = yPos + 45
+    yPos = yPos + 42
     yPos = createSlider("Detection Radius", getgenv().AutoDefuseSettings, "DetectionRadius", 10, 100, yPos)
     yPos = createCheckbox("Show Circle", getgenv().AutoDefuseSettings, "ShowCircle", yPos)
 
