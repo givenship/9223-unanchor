@@ -613,8 +613,16 @@ function MiscModule.CreateUI(parent)
     yPos = yPos + 10
     yPos = createSectionTitle("AUTO FARM", yPos)
 
-    getgenv().AutoFarmSettings = getgenv().AutoFarmSettings or { Enabled = false }
+    getgenv().AutoFarmSettings = getgenv().AutoFarmSettings or {
+        Enabled = false,
+        AntiBack = false,
+        TargetMemory = false,
+        ShowCircle = false,
+        DetectRadius = 30,
+        Waypoint = nil
+    }
 
+    -- AutoFarm toggle
     local autoFarmActive = false
     local autoFarmBtn = Instance.new("TextButton")
     autoFarmBtn.Size = UDim2.new(1, -20, 0, 40)
@@ -671,11 +679,87 @@ function MiscModule.CreateUI(parent)
             autoFarmBtn.BackgroundColor3 = BTN_OFF
         end
     end)
-    yPos = yPos + 48
+    yPos = yPos + 45
 
-    -- AutoFarm info
+    -- Anti Back checkbox
+    yPos = createCheckbox("Anti Back", getgenv().AutoFarmSettings, "AntiBack", yPos)
+
+    -- Target Memory checkbox
+    yPos = createCheckbox("Target Memory", getgenv().AutoFarmSettings, "TargetMemory", yPos)
+
+    -- Show Circle checkbox
+    yPos = createCheckbox("Show Circle", getgenv().AutoFarmSettings, "ShowCircle", yPos)
+
+    -- Detection Radius slider
+    yPos = createSlider("Detect Radius", getgenv().AutoFarmSettings, "DetectRadius", 10, 100, yPos)
+
+    -- Set Waypoint button
+    local setWpBtn = Instance.new("TextButton")
+    setWpBtn.Size = UDim2.new(0.5, -15, 0, 32)
+    setWpBtn.Position = UDim2.new(0, 10, 0, yPos)
+    setWpBtn.BackgroundColor3 = BTN_OFF
+    setWpBtn.BorderSizePixel = 0
+    setWpBtn.AutoButtonColor = false
+    setWpBtn.Text = "Set Waypoint"
+    setWpBtn.Font = Enum.Font.GothamBold
+    setWpBtn.TextSize = 12
+    setWpBtn.TextColor3 = TEXT_COL
+    setWpBtn.ZIndex = 68
+    setWpBtn.Parent = miscContent
+
+    setWpBtn.MouseEnter:Connect(function() setWpBtn.BackgroundColor3 = BTN_ON end)
+    setWpBtn.MouseLeave:Connect(function() setWpBtn.BackgroundColor3 = BTN_OFF end)
+
+    setWpBtn.MouseButton1Click:Connect(function()
+        if getgenv().AutoFarmControl and getgenv().AutoFarmControl.SetWaypoint then
+            getgenv().AutoFarmControl.SetWaypoint()
+        else
+            local r = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if r then
+                getgenv().AutoFarmSettings.Waypoint = r.Position
+            end
+        end
+        setWpBtn.Text = "Waypoint Set!"
+        setWpBtn.BackgroundColor3 = BTN_ON
+        task.wait(0.5)
+        setWpBtn.Text = "Set Waypoint"
+        setWpBtn.BackgroundColor3 = BTN_OFF
+    end)
+
+    -- Remove Waypoint button
+    local rmWpBtn = Instance.new("TextButton")
+    rmWpBtn.Size = UDim2.new(0.5, -15, 0, 32)
+    rmWpBtn.Position = UDim2.new(0.5, 5, 0, yPos)
+    rmWpBtn.BackgroundColor3 = BTN_OFF
+    rmWpBtn.BorderSizePixel = 0
+    rmWpBtn.AutoButtonColor = false
+    rmWpBtn.Text = "Remove Waypoint"
+    rmWpBtn.Font = Enum.Font.GothamBold
+    rmWpBtn.TextSize = 12
+    rmWpBtn.TextColor3 = TEXT_COL
+    rmWpBtn.ZIndex = 68
+    rmWpBtn.Parent = miscContent
+
+    rmWpBtn.MouseEnter:Connect(function() rmWpBtn.BackgroundColor3 = BTN_ON end)
+    rmWpBtn.MouseLeave:Connect(function() rmWpBtn.BackgroundColor3 = BTN_OFF end)
+
+    rmWpBtn.MouseButton1Click:Connect(function()
+        if getgenv().AutoFarmControl and getgenv().AutoFarmControl.RemoveWaypoint then
+            getgenv().AutoFarmControl.RemoveWaypoint()
+        else
+            getgenv().AutoFarmSettings.Waypoint = nil
+        end
+        rmWpBtn.Text = "Removed!"
+        rmWpBtn.BackgroundColor3 = BTN_ON
+        task.wait(0.5)
+        rmWpBtn.Text = "Remove Waypoint"
+        rmWpBtn.BackgroundColor3 = BTN_OFF
+    end)
+    yPos = yPos + 40
+
+    -- Info
     local farmInfoBg = Instance.new("Frame")
-    farmInfoBg.Size = UDim2.new(1, -20, 0, 55)
+    farmInfoBg.Size = UDim2.new(1, -20, 0, 65)
     farmInfoBg.Position = UDim2.new(0, 10, 0, yPos)
     farmInfoBg.BackgroundColor3 = TXT_BG
     farmInfoBg.BorderSizePixel = 0
@@ -686,16 +770,16 @@ function MiscModule.CreateUI(parent)
     farmInfo.Size = UDim2.new(1, -8, 1, 0)
     farmInfo.Position = UDim2.new(0, 4, 0, 0)
     farmInfo.BackgroundTransparency = 1
-    farmInfo.Text = "Monsters: Pathfind to nearest Human,\nattack at 7 studs range.\nHumans: Pathfind to nearest Monster,\nattack at 4 studs until dead."
+    farmInfo.Text = "Monsters: Follow humans, click after idle 5s.\nHumans: Detect & follow monsters, 30cps.\nAnti Back: retreat when monster retreats.\nTarget Memory: lock onto first target.\nWaypoint: return home when no enemies."
     farmInfo.Font = Enum.Font.Gotham
-    farmInfo.TextSize = 11
+    farmInfo.TextSize = 10
     farmInfo.TextColor3 = TEXT_COL
     farmInfo.TextXAlignment = Enum.TextXAlignment.Left
     farmInfo.TextYAlignment = Enum.TextYAlignment.Top
     farmInfo.TextWrapped = true
     farmInfo.ZIndex = 67
     farmInfo.Parent = farmInfoBg
-    yPos = yPos + 60
+    yPos = yPos + 70
 
     -- ============================================
     -- RAGDOLL CONTROL
