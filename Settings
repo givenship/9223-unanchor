@@ -1,5 +1,6 @@
 -- Euva Settings Module
 -- Compatible with Euva pink theme layout system
+-- All ZIndex >= 65 to render above deco ImageLabels
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -10,6 +11,14 @@ local LocalPlayer = Players.LocalPlayer
 local SettingsModule = {}
 SettingsModule.Layout = nil -- Set by Main before CreateUI
 
+local LABEL_BG = Color3.fromRGB(240, 220, 230)
+local TEXT_COL = Color3.fromRGB(0, 0, 0)
+local Z_BG = 66
+local Z_TEXT = 67
+local Z_BTN = 68
+local Z_FILL = 69
+local Z_KNOB = 70
+
 function SettingsModule.CreateUI(parent)
     local settingsContent = Instance.new("ScrollingFrame")
     settingsContent.Size = UDim2.new(1, 0, 1, 0)
@@ -19,15 +28,13 @@ function SettingsModule.CreateUI(parent)
     settingsContent.ScrollBarImageColor3 = Color3.fromRGB(200, 180, 190)
     settingsContent.CanvasSize = UDim2.new(0, 0, 0, 0)
     settingsContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    settingsContent.ZIndex = 65
     settingsContent.Parent = parent
 
     local listLayout = Instance.new("UIListLayout")
     listLayout.Padding = UDim.new(0, 12)
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = settingsContent
-
-    local LABEL_BG = Color3.fromRGB(240, 220, 230)
-    local TEXT_COL = Color3.fromRGB(0, 0, 0)
 
     -- ============================================
     -- GUI TRANSPARENCY
@@ -37,6 +44,7 @@ function SettingsModule.CreateUI(parent)
     transTitle.Size = UDim2.new(1, -20, 0, 28)
     transTitle.BackgroundColor3 = LABEL_BG
     transTitle.BorderSizePixel = 0
+    transTitle.ZIndex = Z_BG
     transTitle.LayoutOrder = 0
     transTitle.Parent = settingsContent
 
@@ -49,9 +57,9 @@ function SettingsModule.CreateUI(parent)
     transTitleText.TextSize = 15
     transTitleText.TextColor3 = TEXT_COL
     transTitleText.TextXAlignment = Enum.TextXAlignment.Left
+    transTitleText.ZIndex = Z_TEXT
     transTitleText.Parent = transTitle
 
-    -- Current value label
     local defaultTrans = 0.1
     if SettingsModule.Layout and SettingsModule.Layout.GetGuiTransparency then
         defaultTrans = SettingsModule.Layout.GetGuiTransparency()
@@ -61,6 +69,7 @@ function SettingsModule.CreateUI(parent)
     transValueBg.Size = UDim2.new(1, -20, 0, 24)
     transValueBg.BackgroundColor3 = LABEL_BG
     transValueBg.BorderSizePixel = 0
+    transValueBg.ZIndex = Z_BG
     transValueBg.LayoutOrder = 1
     transValueBg.Parent = settingsContent
 
@@ -73,14 +82,14 @@ function SettingsModule.CreateUI(parent)
     transValueLabel.TextSize = 13
     transValueLabel.TextColor3 = TEXT_COL
     transValueLabel.TextXAlignment = Enum.TextXAlignment.Left
-    transValueLabel.LayoutOrder = 1
+    transValueLabel.ZIndex = Z_TEXT
     transValueLabel.Parent = transValueBg
 
-    -- Slider track
     local sliderFrame = Instance.new("Frame")
     sliderFrame.Size = UDim2.new(1, -20, 0, 30)
     sliderFrame.BackgroundColor3 = Color3.fromRGB(200, 180, 190)
     sliderFrame.BorderSizePixel = 0
+    sliderFrame.ZIndex = Z_BTN
     sliderFrame.LayoutOrder = 2
     sliderFrame.Parent = settingsContent
 
@@ -93,7 +102,7 @@ function SettingsModule.CreateUI(parent)
     fill.Size = UDim2.new(normalized, 0, 1, 0)
     fill.BackgroundColor3 = Color3.fromRGB(244, 167, 187)
     fill.BorderSizePixel = 0
-    fill.ZIndex = 27
+    fill.ZIndex = Z_FILL
     fill.Parent = sliderFrame
 
     local fillCorner = Instance.new("UICorner")
@@ -107,7 +116,7 @@ function SettingsModule.CreateUI(parent)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     knob.BorderSizePixel = 0
     knob.Text = ""
-    knob.ZIndex = 28
+    knob.ZIndex = Z_KNOB
     knob.Parent = fill
 
     local knobCorner = Instance.new("UICorner")
@@ -151,6 +160,7 @@ function SettingsModule.CreateUI(parent)
     reloadTitleBg.Size = UDim2.new(1, -20, 0, 28)
     reloadTitleBg.BackgroundColor3 = LABEL_BG
     reloadTitleBg.BorderSizePixel = 0
+    reloadTitleBg.ZIndex = Z_BG
     reloadTitleBg.LayoutOrder = 3
     reloadTitleBg.Parent = settingsContent
 
@@ -163,9 +173,9 @@ function SettingsModule.CreateUI(parent)
     reloadTitle.TextSize = 15
     reloadTitle.TextColor3 = TEXT_COL
     reloadTitle.TextXAlignment = Enum.TextXAlignment.Left
+    reloadTitle.ZIndex = Z_TEXT
     reloadTitle.Parent = reloadTitleBg
 
-    -- Reload button
     local reloadButton = Instance.new("TextButton")
     reloadButton.Size = UDim2.new(1, -20, 0, 42)
     reloadButton.BackgroundColor3 = LABEL_BG
@@ -175,6 +185,7 @@ function SettingsModule.CreateUI(parent)
     reloadButton.TextSize = 14
     reloadButton.TextColor3 = TEXT_COL
     reloadButton.AutoButtonColor = false
+    reloadButton.ZIndex = Z_BTN
     reloadButton.LayoutOrder = 4
     reloadButton.Parent = settingsContent
 
@@ -192,18 +203,12 @@ function SettingsModule.CreateUI(parent)
     reloadButton.MouseButton1Click:Connect(function()
         reloadButton.Text = "Reloading..."
         reloadButton.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
-
         task.wait(0.5)
-
         for _, gui in pairs(CoreGui:GetChildren()) do
-            if gui.Name == "EuvaMainGUI" then
-                gui:Destroy()
-            end
+            if gui.Name == "EuvaMainGUI" then gui:Destroy() end
         end
-
         local blur = game:GetService("Lighting"):FindFirstChild("EuvaBlur")
         if blur then blur:Destroy() end
-
         print("[Euva] GUI destroyed - Please re-execute your script")
     end)
 
@@ -211,6 +216,7 @@ function SettingsModule.CreateUI(parent)
     reloadNoteBg.Size = UDim2.new(1, -20, 0, 30)
     reloadNoteBg.BackgroundColor3 = LABEL_BG
     reloadNoteBg.BorderSizePixel = 0
+    reloadNoteBg.ZIndex = Z_BG
     reloadNoteBg.LayoutOrder = 5
     reloadNoteBg.Parent = settingsContent
 
@@ -224,6 +230,7 @@ function SettingsModule.CreateUI(parent)
     reloadNote.TextColor3 = TEXT_COL
     reloadNote.TextXAlignment = Enum.TextXAlignment.Left
     reloadNote.TextWrapped = true
+    reloadNote.ZIndex = Z_TEXT
     reloadNote.Parent = reloadNoteBg
 
     -- ============================================
@@ -234,6 +241,7 @@ function SettingsModule.CreateUI(parent)
     keybindsTitleBg.Size = UDim2.new(1, -20, 0, 28)
     keybindsTitleBg.BackgroundColor3 = LABEL_BG
     keybindsTitleBg.BorderSizePixel = 0
+    keybindsTitleBg.ZIndex = Z_BG
     keybindsTitleBg.LayoutOrder = 6
     keybindsTitleBg.Parent = settingsContent
 
@@ -246,12 +254,14 @@ function SettingsModule.CreateUI(parent)
     keybindsTitle.TextSize = 15
     keybindsTitle.TextColor3 = TEXT_COL
     keybindsTitle.TextXAlignment = Enum.TextXAlignment.Left
+    keybindsTitle.ZIndex = Z_TEXT
     keybindsTitle.Parent = keybindsTitleBg
 
     local keybindInfoBg = Instance.new("Frame")
     keybindInfoBg.Size = UDim2.new(1, -20, 0, 50)
     keybindInfoBg.BackgroundColor3 = LABEL_BG
     keybindInfoBg.BorderSizePixel = 0
+    keybindInfoBg.ZIndex = Z_BG
     keybindInfoBg.LayoutOrder = 7
     keybindInfoBg.Parent = settingsContent
 
@@ -265,6 +275,7 @@ function SettingsModule.CreateUI(parent)
     keybindInfo.TextColor3 = TEXT_COL
     keybindInfo.TextXAlignment = Enum.TextXAlignment.Left
     keybindInfo.TextWrapped = true
+    keybindInfo.ZIndex = Z_TEXT
     keybindInfo.Parent = keybindInfoBg
 
     -- ============================================
@@ -275,6 +286,7 @@ function SettingsModule.CreateUI(parent)
     infoTitleBg.Size = UDim2.new(1, -20, 0, 28)
     infoTitleBg.BackgroundColor3 = LABEL_BG
     infoTitleBg.BorderSizePixel = 0
+    infoTitleBg.ZIndex = Z_BG
     infoTitleBg.LayoutOrder = 8
     infoTitleBg.Parent = settingsContent
 
@@ -287,12 +299,14 @@ function SettingsModule.CreateUI(parent)
     infoTitle.TextSize = 15
     infoTitle.TextColor3 = TEXT_COL
     infoTitle.TextXAlignment = Enum.TextXAlignment.Left
+    infoTitle.ZIndex = Z_TEXT
     infoTitle.Parent = infoTitleBg
 
     local infoTextBg = Instance.new("Frame")
     infoTextBg.Size = UDim2.new(1, -20, 0, 100)
     infoTextBg.BackgroundColor3 = LABEL_BG
     infoTextBg.BorderSizePixel = 0
+    infoTextBg.ZIndex = Z_BG
     infoTextBg.LayoutOrder = 9
     infoTextBg.Parent = settingsContent
 
@@ -307,11 +321,11 @@ function SettingsModule.CreateUI(parent)
     infoText.TextXAlignment = Enum.TextXAlignment.Left
     infoText.TextYAlignment = Enum.TextYAlignment.Top
     infoText.TextWrapped = true
+    infoText.ZIndex = Z_TEXT
     infoText.Parent = infoTextBg
 end
 
 function SettingsModule.Cleanup()
-    -- No cleanup needed
 end
 
 return SettingsModule
