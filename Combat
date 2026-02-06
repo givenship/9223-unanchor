@@ -673,7 +673,63 @@ function CombatModule.CreateUI(parent)
         if enabled then getgenv().AutoDefuseControl.Start() else getgenv().AutoDefuseControl.Stop() end
     end)
 
-    yPos = createSlider("React Delay (ms)", getgenv().AutoDefuseSettings, "Delay", 0, 5000, yPos)
+    -- React Delay TextBox
+    local delayContainer = Instance.new("Frame")
+    delayContainer.Size = UDim2.new(1, -20, 0, 35)
+    delayContainer.Position = UDim2.new(0, 10, 0, yPos)
+    delayContainer.BackgroundTransparency = 1
+    delayContainer.ZIndex = 65
+    delayContainer.Parent = combatContent
+
+    local delayLabelBg = Instance.new("Frame")
+    delayLabelBg.Size = UDim2.new(0, 0, 0, 30)
+    delayLabelBg.AutomaticSize = Enum.AutomaticSize.X
+    delayLabelBg.Position = UDim2.new(0, 0, 0, 2)
+    delayLabelBg.BackgroundColor3 = TXT_BG
+    delayLabelBg.BorderSizePixel = 0
+    delayLabelBg.ZIndex = 66
+    delayLabelBg.Parent = delayContainer
+    addPadding(delayLabelBg, 6, 0)
+
+    local delayLabel = Instance.new("TextLabel")
+    delayLabel.Size = UDim2.new(0, 0, 1, 0)
+    delayLabel.AutomaticSize = Enum.AutomaticSize.X
+    delayLabel.BackgroundTransparency = 1
+    delayLabel.Text = "React Delay (ms):"
+    delayLabel.Font = Enum.Font.Gotham
+    delayLabel.TextSize = 12
+    delayLabel.TextColor3 = TEXT_COL
+    delayLabel.TextXAlignment = Enum.TextXAlignment.Left
+    delayLabel.ZIndex = 67
+    delayLabel.Parent = delayLabelBg
+
+    local delayBox = Instance.new("TextBox")
+    delayBox.Size = UDim2.new(0, 80, 0, 30)
+    delayBox.Position = UDim2.new(1, -80, 0, 2)
+    delayBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    delayBox.BorderSizePixel = 1
+    delayBox.BorderColor3 = Color3.fromRGB(184, 193, 206)
+    delayBox.Text = tostring(getgenv().AutoDefuseSettings.Delay or 0)
+    delayBox.PlaceholderText = "0"
+    delayBox.Font = Enum.Font.Gotham
+    delayBox.TextSize = 13
+    delayBox.TextColor3 = TEXT_COL
+    delayBox.ClearTextOnFocus = false
+    delayBox.ZIndex = 68
+    delayBox.Parent = delayContainer
+
+    delayBox.FocusLost:Connect(function()
+        local num = tonumber(delayBox.Text)
+        if num and num >= 0 then
+            num = math.floor(num)
+            getgenv().AutoDefuseSettings.Delay = num
+            delayBox.Text = tostring(num)
+        else
+            delayBox.Text = tostring(getgenv().AutoDefuseSettings.Delay or 0)
+        end
+    end)
+
+    yPos = yPos + 45
     yPos = createSlider("Detection Radius", getgenv().AutoDefuseSettings, "DetectionRadius", 10, 100, yPos)
     yPos = createCheckbox("Show Circle", getgenv().AutoDefuseSettings, "ShowCircle", yPos)
 
