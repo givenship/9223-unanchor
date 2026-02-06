@@ -10,10 +10,10 @@ function Decorations.Create(mainFrame, contentArea)
     local ASSETS = Decorations.Theme.Assets
     local decoTransValue = Decorations.Theme.Config.DefaultDecoTransparency
     
-    -- Tree Left (content bottom-left)
+    -- Left ImageLabel (content bottom-left area)
     local treeL = Instance.new("ImageLabel")
-    treeL.Size = UDim2.new(0, 40, 0, 40)
-    treeL.Position = UDim2.new(0, 10, 1, -50)
+    treeL.Size = UDim2.new(0, 200, 0, 200)
+    treeL.Position = UDim2.new(0, -30, 1, -165)
     treeL.BackgroundTransparency = 1
     treeL.Image = ASSETS.TreeL
     treeL.ImageTransparency = 0.4
@@ -21,10 +21,10 @@ function Decorations.Create(mainFrame, contentArea)
     treeL.Parent = contentArea
     Decorations.Elements.TreeL = treeL
 
-    -- Tree Right (content top-right, rotated 180)
+    -- Right ImageLabel (content top-right area)
     local treeR = Instance.new("ImageLabel")
-    treeR.Size = UDim2.new(0, 40, 0, 40)
-    treeR.Position = UDim2.new(1, -50, 0, 10)
+    treeR.Size = UDim2.new(0, 200, 0, 200)
+    treeR.Position = UDim2.new(1, -170, 0, 40)
     treeR.BackgroundTransparency = 1
     treeR.Image = ASSETS.TreeR
     treeR.ImageTransparency = 0.4
