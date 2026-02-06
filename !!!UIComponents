@@ -1,5 +1,6 @@
 -- Euva UI Components Module
 -- Reusable UI elements
+-- All ZIndex >= 65 to render above deco ImageLabels (ZIndex 55-60)
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -8,10 +9,22 @@ local StarterGui = game:GetService("StarterGui")
 local Components = {}
 Components.Theme = nil -- Set by Main
 
+-- Shared style constants
 local LABEL_BG_COLOR = Color3.fromRGB(240, 220, 230) -- F0DCE6
-local TEXT_COLOR = Color3.fromRGB(0, 0, 0)
-local BTN_DISABLED_COLOR = Color3.fromRGB(255, 255, 255)
-local BTN_ENABLED_COLOR = Color3.fromRGB(240, 220, 230) -- F0DCE6
+local TEXT_COLOR = Color3.fromRGB(0, 0, 0) -- Black
+local BTN_DISABLED_COLOR = Color3.fromRGB(255, 255, 255) -- White when off
+local BTN_ENABLED_COLOR = Color3.fromRGB(240, 220, 230) -- F0DCE6 when on
+
+-- ZIndex layers (all above deco at 55-60)
+local Z_FRAME  = 65
+local Z_BG     = 66
+local Z_TEXT   = 67
+local Z_BTN    = 68
+local Z_SLIDER = 68
+local Z_FILL   = 69
+local Z_KNOB   = 70
+local Z_DROP   = 75
+local Z_DOPT   = 76
 
 local function tween(obj, info, props)
     local t = TweenService:Create(obj, info, props)
@@ -54,13 +67,11 @@ function Components.Tween(obj, info, props)
 end
 
 function Components.CreateSection(parent, title)
-    local THEME = Components.Theme.Colors
-    
     local s = Instance.new("Frame")
     s.BackgroundTransparency = 1
     s.Size = UDim2.new(1, 0, 0, 0)
     s.AutomaticSize = Enum.AutomaticSize.Y
-    s.ZIndex = 25
+    s.ZIndex = Z_FRAME
     s.Parent = parent
 
     local l = Instance.new("UIListLayout")
@@ -69,15 +80,14 @@ function Components.CreateSection(parent, title)
     l.Parent = s
 
     if title then
-        -- Section title with square F0DCE6 background
         local titleBg = Instance.new("Frame")
         titleBg.Size = UDim2.new(1, 0, 0, 28)
         titleBg.BackgroundColor3 = LABEL_BG_COLOR
         titleBg.BackgroundTransparency = 0
         titleBg.BorderSizePixel = 0
-        titleBg.ZIndex = 25
+        titleBg.ZIndex = Z_BG
         titleBg.Parent = s
-        
+
         local t = Instance.new("TextLabel")
         t.BackgroundTransparency = 1
         t.Size = UDim2.new(1, -8, 1, 0)
@@ -87,24 +97,21 @@ function Components.CreateSection(parent, title)
         t.TextSize = 15
         t.TextColor3 = TEXT_COLOR
         t.TextXAlignment = Enum.TextXAlignment.Left
-        t.ZIndex = 26
+        t.ZIndex = Z_TEXT
         t.Parent = titleBg
     end
     return s
 end
 
 function Components.CreateLabel(parent, txt)
-    local THEME = Components.Theme.Colors
-    
-    -- Label with square F0DCE6 background
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 0, 24)
     bg.BackgroundColor3 = LABEL_BG_COLOR
     bg.BackgroundTransparency = 0
     bg.BorderSizePixel = 0
-    bg.ZIndex = 25
+    bg.ZIndex = Z_BG
     bg.Parent = parent
-    
+
     local lb = Instance.new("TextLabel")
     lb.BackgroundTransparency = 1
     lb.Size = UDim2.new(1, -8, 1, 0)
@@ -114,14 +121,12 @@ function Components.CreateLabel(parent, txt)
     lb.TextSize = 13
     lb.TextColor3 = TEXT_COLOR
     lb.TextXAlignment = Enum.TextXAlignment.Left
-    lb.ZIndex = 26
+    lb.ZIndex = Z_TEXT
     lb.Parent = bg
     return lb
 end
 
 function Components.CreateButton(parent, txt, cb)
-    local THEME = Components.Theme.Colors
-    
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0, 160, 0, 36)
     b.BackgroundColor3 = BTN_DISABLED_COLOR
@@ -131,7 +136,7 @@ function Components.CreateButton(parent, txt, cb)
     b.Font = Enum.Font.Gotham
     b.TextSize = 13
     b.TextColor3 = TEXT_COLOR
-    b.ZIndex = 26
+    b.ZIndex = Z_BTN
     b.Parent = parent
 
     local c = Instance.new("UICorner")
@@ -149,10 +154,11 @@ function Components.CreateButton(parent, txt, cb)
     return b
 end
 
--- State toggle button: white when disabled, F0DCE6 when enabled
+-- State toggle button: white when disabled ("DISABLED"), F0DCE6 when enabled
+-- This replaces the red/gray buttons in Misc
 function Components.CreateStateButton(parent, txt, default, cb)
     local enabled = default or false
-    
+
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0, 160, 0, 36)
     b.BackgroundColor3 = enabled and BTN_ENABLED_COLOR or BTN_DISABLED_COLOR
@@ -162,13 +168,13 @@ function Components.CreateStateButton(parent, txt, default, cb)
     b.Font = Enum.Font.Gotham
     b.TextSize = 13
     b.TextColor3 = TEXT_COLOR
-    b.ZIndex = 26
+    b.ZIndex = Z_BTN
     b.Parent = parent
-    
+
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, 6)
     c.Parent = b
-    
+
     b.MouseButton1Click:Connect(function()
         enabled = not enabled
         tween(b, TweenInfo.new(0.15), {
@@ -178,20 +184,19 @@ function Components.CreateStateButton(parent, txt, default, cb)
         pop(b)
         if cb then cb(enabled) end
     end)
-    
+
     return b, function() return enabled end
 end
 
 function Components.CreateToggle(parent, txt, default, cb)
-    local THEME = Components.Theme.Colors
     local enabled = default or false
-    
+
     local container = Instance.new("Frame")
     container.BackgroundTransparency = 1
     container.Size = UDim2.new(1, 0, 0, 36)
-    container.ZIndex = 26
+    container.ZIndex = Z_FRAME
     container.Parent = parent
-    
+
     -- Toggle switch: white when off, F0DCE6 when on
     local toggle = Instance.new("TextButton")
     toggle.Size = UDim2.new(0, 50, 0, 26)
@@ -199,34 +204,34 @@ function Components.CreateToggle(parent, txt, default, cb)
     toggle.BackgroundColor3 = enabled and BTN_ENABLED_COLOR or BTN_DISABLED_COLOR
     toggle.BorderSizePixel = 0
     toggle.Text = ""
-    toggle.ZIndex = 27
+    toggle.ZIndex = Z_BTN
     toggle.Parent = container
-    
+
     local tc = Instance.new("UICorner")
     tc.CornerRadius = UDim.new(0, 13)
     tc.Parent = toggle
-    
+
     local knob = Instance.new("Frame")
     knob.Size = UDim2.new(0, 20, 0, 20)
     knob.Position = enabled and UDim2.new(1, -23, 0, 3) or UDim2.new(0, 3, 0, 3)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    knob.ZIndex = 28
+    knob.ZIndex = Z_KNOB
     knob.Parent = toggle
-    
+
     local kc = Instance.new("UICorner")
     kc.CornerRadius = UDim.new(1, 0)
     kc.Parent = knob
-    
-    -- Label with square background
+
+    -- Label with F0DCE6 background
     local labelBg = Instance.new("Frame")
     labelBg.BackgroundColor3 = LABEL_BG_COLOR
     labelBg.BackgroundTransparency = 0
     labelBg.BorderSizePixel = 0
     labelBg.Size = UDim2.new(1, -60, 1, 0)
     labelBg.Position = UDim2.new(0, 60, 0, 0)
-    labelBg.ZIndex = 25
+    labelBg.ZIndex = Z_BG
     labelBg.Parent = container
-    
+
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, -8, 1, 0)
@@ -236,9 +241,9 @@ function Components.CreateToggle(parent, txt, default, cb)
     label.TextSize = 13
     label.TextColor3 = TEXT_COLOR
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.ZIndex = 26
+    label.ZIndex = Z_TEXT
     label.Parent = labelBg
-    
+
     toggle.MouseButton1Click:Connect(function()
         enabled = not enabled
         tween(toggle, TweenInfo.new(0.15), {
@@ -249,7 +254,7 @@ function Components.CreateToggle(parent, txt, default, cb)
         })
         if cb then cb(enabled) end
     end)
-    
+
     return container, function() return enabled end
 end
 
@@ -258,9 +263,9 @@ function Components.CreateSlider(parent, title, default, min, max, onChange)
     min = min or 0
     max = max or 1
     default = default or min
-    
+
     local sec = Components.CreateSection(parent, nil)
-    
+
     local normalized = (default - min) / (max - min)
     local valueLabel = Components.CreateLabel(sec, title .. ": " .. math.floor(default) .. (max <= 1 and "%" or ""))
 
@@ -268,7 +273,7 @@ function Components.CreateSlider(parent, title, default, min, max, onChange)
     slider.Size = UDim2.new(1, -20, 0, 30)
     slider.BackgroundColor3 = THEME.SliderBg
     slider.BorderSizePixel = 0
-    slider.ZIndex = 26
+    slider.ZIndex = Z_SLIDER
     slider.Parent = sec
 
     local sc = Instance.new("UICorner")
@@ -279,7 +284,7 @@ function Components.CreateSlider(parent, title, default, min, max, onChange)
     fill.Size = UDim2.new(normalized, 0, 1, 0)
     fill.BackgroundColor3 = THEME.SliderFill
     fill.BorderSizePixel = 0
-    fill.ZIndex = 27
+    fill.ZIndex = Z_FILL
     fill.Parent = slider
 
     local fc = Instance.new("UICorner")
@@ -293,7 +298,7 @@ function Components.CreateSlider(parent, title, default, min, max, onChange)
     knob.BackgroundColor3 = THEME.SliderKnob
     knob.BorderSizePixel = 0
     knob.Text = ""
-    knob.ZIndex = 28
+    knob.ZIndex = Z_KNOB
     knob.Parent = fill
 
     local kc = Instance.new("UICorner")
@@ -323,13 +328,13 @@ function Components.CreateSlider(parent, title, default, min, max, onChange)
         local value = min + (max - min) * rel
 
         fill.Size = UDim2.new(rel, 0, 1, 0)
-        
+
         if max <= 1 then
             valueLabel.Text = title .. ": " .. math.floor(rel * 100) .. "%"
         else
             valueLabel.Text = title .. ": " .. math.floor(value)
         end
-        
+
         if onChange then onChange(value) end
     end)
 
@@ -338,25 +343,24 @@ function Components.CreateSlider(parent, title, default, min, max, onChange)
 end
 
 function Components.CreateDropdown(parent, title, options, default, onChange)
-    local THEME = Components.Theme.Colors
     local selected = default or options[1]
     local expanded = false
-    
+
     local container = Instance.new("Frame")
     container.BackgroundTransparency = 1
     container.Size = UDim2.new(1, 0, 0, 36)
     container.ClipsDescendants = false
-    container.ZIndex = 30
+    container.ZIndex = Z_DROP
     container.Parent = parent
-    
+
     local labelBg = Instance.new("Frame")
     labelBg.Size = UDim2.new(0, 100, 0, 36)
     labelBg.BackgroundColor3 = LABEL_BG_COLOR
     labelBg.BackgroundTransparency = 0
     labelBg.BorderSizePixel = 0
-    labelBg.ZIndex = 29
+    labelBg.ZIndex = Z_BG
     labelBg.Parent = container
-    
+
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, -8, 1, 0)
@@ -366,9 +370,9 @@ function Components.CreateDropdown(parent, title, options, default, onChange)
     label.TextSize = 13
     label.TextColor3 = TEXT_COLOR
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.ZIndex = 30
+    label.ZIndex = Z_TEXT
     label.Parent = labelBg
-    
+
     local dropBtn = Instance.new("TextButton")
     dropBtn.Size = UDim2.new(1, -110, 0, 32)
     dropBtn.Position = UDim2.new(0, 105, 0, 2)
@@ -378,30 +382,30 @@ function Components.CreateDropdown(parent, title, options, default, onChange)
     dropBtn.Font = Enum.Font.Gotham
     dropBtn.TextSize = 12
     dropBtn.TextColor3 = TEXT_COLOR
-    dropBtn.ZIndex = 31
+    dropBtn.ZIndex = Z_DROP
     dropBtn.Parent = container
-    
+
     local dc = Instance.new("UICorner")
     dc.CornerRadius = UDim.new(0, 6)
     dc.Parent = dropBtn
-    
+
     local optionFrame = Instance.new("Frame")
     optionFrame.Size = UDim2.new(1, -110, 0, #options * 28)
     optionFrame.Position = UDim2.new(0, 105, 0, 36)
     optionFrame.BackgroundColor3 = LABEL_BG_COLOR
     optionFrame.BorderSizePixel = 0
     optionFrame.Visible = false
-    optionFrame.ZIndex = 100
+    optionFrame.ZIndex = Z_DOPT + 20
     optionFrame.Parent = container
-    
+
     local oc = Instance.new("UICorner")
     oc.CornerRadius = UDim.new(0, 6)
     oc.Parent = optionFrame
-    
+
     local ol = Instance.new("UIListLayout")
     ol.SortOrder = Enum.SortOrder.LayoutOrder
     ol.Parent = optionFrame
-    
+
     for _, opt in ipairs(options) do
         local optBtn = Instance.new("TextButton")
         optBtn.Size = UDim2.new(1, 0, 0, 28)
@@ -410,9 +414,9 @@ function Components.CreateDropdown(parent, title, options, default, onChange)
         optBtn.Font = Enum.Font.Gotham
         optBtn.TextSize = 12
         optBtn.TextColor3 = TEXT_COLOR
-        optBtn.ZIndex = 101
+        optBtn.ZIndex = Z_DOPT + 21
         optBtn.Parent = optionFrame
-        
+
         optBtn.MouseButton1Click:Connect(function()
             selected = opt
             dropBtn.Text = selected .. " ▼"
@@ -421,12 +425,12 @@ function Components.CreateDropdown(parent, title, options, default, onChange)
             if onChange then onChange(selected) end
         end)
     end
-    
+
     dropBtn.MouseButton1Click:Connect(function()
         expanded = not expanded
         optionFrame.Visible = expanded
     end)
-    
+
     return container
 end
 
