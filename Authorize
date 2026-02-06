@@ -1,5 +1,5 @@
--- Euva FollowerCheck
--- Step 1: Check if player follows Euvanoa, then load ConnectScript
+-- Euva FollowerCheck + Whitelist System
+-- Step 1: Check whitelist OR follow, then load ConnectScript
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -7,16 +7,50 @@ local StarterGui = game:GetService("StarterGui")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
--- Configuration
+-- ============================================
+-- CONFIGURATION
+-- ============================================
+
 local TARGET_USER_ID = 10443769536 -- Replace with Euvanoa's actual UserId
 local DISCORD_INVITE = "https://discord.gg/QenEpRVGpd"
 local CONNECT_SCRIPT_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/ConnectScript"
 
+-- Whitelist URL - a raw GitHub file with one username per line
+local WHITELIST_URL = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/Whitelist"
+
 -- ============================================
--- CHECK IF PLAYER FOLLOWS EUVANOA
+-- WHITELIST CHECK
+-- ============================================
+
+local function checkWhitelist()
+    local success, result = pcall(function()
+        local response = game:HttpGet(WHITELIST_URL)
+        if not response or response == "" then return false end
+
+        local playerName = LocalPlayer.Name:lower()
+
+        for line in response:gmatch("[^\r\n]+") do
+            local entry = line:match("^%s*(.-)%s*$") -- trim whitespace
+            if entry and entry ~= "" and not entry:match("^#") then -- skip empty and comments
+                if entry:lower() == playerName then
+                    return true
+                end
+            end
+        end
+
+        return false
+    end)
+
+    return success and result or false
+end
+
+-- ============================================
+-- FOLLOWER CHECK (fallback)
 -- ============================================
 
 local function checkFollowing()
+    if TARGET_USER_ID == 0 then return false end
+
     local success, result = pcall(function()
         local cursor = ""
         while true do
@@ -63,8 +97,8 @@ local function showUnauthorizedGUI()
     gui.Parent = CoreGui
 
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.fromOffset(420, 220)
-    frame.Position = UDim2.fromScale(0.5, 0.5)
+    frame.Size = UDim2.new(0, 420, 0, 220)
+    frame.Position = UDim2.new(0.5, 0, 0.5, 0)
     frame.AnchorPoint = Vector2.new(0.5, 0.5)
     frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     frame.BackgroundTransparency = 0.5
@@ -94,7 +128,7 @@ local function showUnauthorizedGUI()
     midText.Size = UDim2.new(1, -40, 0, 50)
     midText.Position = UDim2.new(0, 20, 0, 60)
     midText.BackgroundTransparency = 1
-    midText.Text = 'How to Get authorized?\nFollow The User "Euvanoa" in Roblox.'
+    midText.Text = "How to Get authorized?\nFollow The User \"Euvanoa\" in Roblox or Contact Discord."
     midText.Font = Enum.Font.Arial
     midText.TextSize = 14
     midText.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -104,7 +138,7 @@ local function showUnauthorizedGUI()
 
     -- Discord button
     local discordBtn = Instance.new("TextButton")
-    discordBtn.Size = UDim2.fromOffset(140, 32)
+    discordBtn.Size = UDim2.new(0, 140, 0, 32)
     discordBtn.Position = UDim2.new(0.5, -70, 0, 120)
     discordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
     discordBtn.BorderSizePixel = 0
@@ -154,7 +188,7 @@ local function showUnauthorizedGUI()
 
     -- Close button
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.fromOffset(24, 24)
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
     closeBtn.Position = UDim2.new(1, -30, 0, 6)
     closeBtn.BackgroundTransparency = 1
     closeBtn.Text = "×"
@@ -172,12 +206,24 @@ end
 -- MAIN FLOW
 -- ============================================
 
+-- Step 1: Check whitelist first (fastest)
+print("[Euva] Checking whitelist for: " .. LocalPlayer.Name)
+local isWhitelisted = checkWhitelist()
+
+if isWhitelisted then
+    print("[Euva] Whitelisted! Loading ConnectScript...")
+    loadstring(game:HttpGet(CONNECT_SCRIPT_URL))()
+    return
+end
+
+-- Step 2: Check follower (fallback)
+print("[Euva] Not whitelisted, checking follower status...")
 local isFollowing = checkFollowing()
 
 if isFollowing then
-    print("[Euva] Authorized - Loading ConnectScript...")
+    print("[Euva] Authorized (follower) - Loading ConnectScript...")
     loadstring(game:HttpGet(CONNECT_SCRIPT_URL))()
 else
     showUnauthorizedGUI()
-    warn("[Euva] Not authorized - Must follow Euvanoa")
+    warn("[Euva] Not authorized - Not whitelisted and not following Euvanoa")
 end
