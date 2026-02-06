@@ -1,5 +1,6 @@
 -- Euva Univ Module
 -- Universal features: Server Join by JobId
+-- All ZIndex >= 65 to render above deco ImageLabels
 
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
@@ -11,6 +12,9 @@ local LABEL_BG = Color3.fromRGB(240, 220, 230)
 local TEXT_COL = Color3.fromRGB(0, 0, 0)
 local BTN_OFF = Color3.fromRGB(255, 255, 255)
 local BTN_ON = Color3.fromRGB(240, 220, 230)
+local Z_BG = 66
+local Z_TEXT = 67
+local Z_BTN = 68
 
 function UnivModule.CreateUI(parent)
     local univContent = Instance.new("ScrollingFrame")
@@ -21,6 +25,7 @@ function UnivModule.CreateUI(parent)
     univContent.ScrollBarImageColor3 = Color3.fromRGB(200, 180, 190)
     univContent.CanvasSize = UDim2.new(0, 0, 0, 0)
     univContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    univContent.ZIndex = 65
     univContent.Parent = parent
 
     local listLayout = Instance.new("UIListLayout")
@@ -36,6 +41,7 @@ function UnivModule.CreateUI(parent)
     titleBg.Size = UDim2.new(1, -20, 0, 28)
     titleBg.BackgroundColor3 = LABEL_BG
     titleBg.BorderSizePixel = 0
+    titleBg.ZIndex = Z_BG
     titleBg.LayoutOrder = 1
     titleBg.Parent = univContent
 
@@ -48,13 +54,14 @@ function UnivModule.CreateUI(parent)
     titleLabel.TextSize = 15
     titleLabel.TextColor3 = TEXT_COL
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.ZIndex = Z_TEXT
     titleLabel.Parent = titleBg
 
-    -- Description
     local descBg = Instance.new("Frame")
     descBg.Size = UDim2.new(1, -20, 0, 24)
     descBg.BackgroundColor3 = LABEL_BG
     descBg.BorderSizePixel = 0
+    descBg.ZIndex = Z_BG
     descBg.LayoutOrder = 2
     descBg.Parent = univContent
 
@@ -67,12 +74,13 @@ function UnivModule.CreateUI(parent)
     descLabel.TextSize = 12
     descLabel.TextColor3 = TEXT_COL
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.ZIndex = Z_TEXT
     descLabel.Parent = descBg
 
-    -- JobId input
     local inputRow = Instance.new("Frame")
     inputRow.Size = UDim2.new(1, -20, 0, 38)
     inputRow.BackgroundTransparency = 1
+    inputRow.ZIndex = 65
     inputRow.LayoutOrder = 3
     inputRow.Parent = univContent
 
@@ -88,7 +96,7 @@ function UnivModule.CreateUI(parent)
     jobIdInput.TextColor3 = TEXT_COL
     jobIdInput.TextXAlignment = Enum.TextXAlignment.Left
     jobIdInput.ClearTextOnFocus = false
-    jobIdInput.ZIndex = 26
+    jobIdInput.ZIndex = Z_BTN
     jobIdInput.Parent = inputRow
 
     local inputCorner = Instance.new("UICorner")
@@ -100,7 +108,6 @@ function UnivModule.CreateUI(parent)
     inputPad.PaddingRight = UDim.new(0, 10)
     inputPad.Parent = jobIdInput
 
-    -- Join button
     local joinButton = Instance.new("TextButton")
     joinButton.Size = UDim2.new(0, 70, 1, 0)
     joinButton.Position = UDim2.new(1, -70, 0, 0)
@@ -111,18 +118,18 @@ function UnivModule.CreateUI(parent)
     joinButton.Font = Enum.Font.GothamBold
     joinButton.TextSize = 14
     joinButton.TextColor3 = TEXT_COL
-    joinButton.ZIndex = 26
+    joinButton.ZIndex = Z_BTN
     joinButton.Parent = inputRow
 
     local joinCorner = Instance.new("UICorner")
     joinCorner.CornerRadius = UDim.new(0, 6)
     joinCorner.Parent = joinButton
 
-    -- Status label
     local statusBg = Instance.new("Frame")
     statusBg.Size = UDim2.new(1, -20, 0, 24)
     statusBg.BackgroundColor3 = LABEL_BG
     statusBg.BorderSizePixel = 0
+    statusBg.ZIndex = Z_BG
     statusBg.LayoutOrder = 4
     statusBg.Parent = univContent
 
@@ -135,9 +142,9 @@ function UnivModule.CreateUI(parent)
     statusLabel.TextSize = 12
     statusLabel.TextColor3 = TEXT_COL
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.ZIndex = Z_TEXT
     statusLabel.Parent = statusBg
 
-    -- Hover effects
     joinButton.MouseEnter:Connect(function()
         TweenService:Create(joinButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_ON}):Play()
     end)
@@ -145,25 +152,20 @@ function UnivModule.CreateUI(parent)
         TweenService:Create(joinButton, TweenInfo.new(0.15), {BackgroundColor3 = BTN_OFF}):Play()
     end)
 
-    -- Join logic
     joinButton.MouseButton1Click:Connect(function()
         local jobId = jobIdInput.Text
         if jobId == "" or jobId == nil then
             statusLabel.Text = "Status: Please enter a JobId"
             return
         end
-
-        -- Visual feedback
         joinButton.BackgroundColor3 = BTN_ON
         joinButton.Text = "..."
         statusLabel.Text = "Status: Teleporting..."
-
         task.spawn(function()
             local placeId = game.PlaceId
             local success, err = pcall(function()
                 TeleportService:TeleportToPlaceInstance(placeId, jobId, Players.LocalPlayer)
             end)
-
             if not success then
                 statusLabel.Text = "Status: Failed - " .. tostring(err)
                 joinButton.Text = "Join"
@@ -180,6 +182,7 @@ function UnivModule.CreateUI(parent)
     quickTitleBg.Size = UDim2.new(1, -20, 0, 28)
     quickTitleBg.BackgroundColor3 = LABEL_BG
     quickTitleBg.BorderSizePixel = 0
+    quickTitleBg.ZIndex = Z_BG
     quickTitleBg.LayoutOrder = 5
     quickTitleBg.Parent = univContent
 
@@ -192,12 +195,13 @@ function UnivModule.CreateUI(parent)
     quickTitle.TextSize = 15
     quickTitle.TextColor3 = TEXT_COL
     quickTitle.TextXAlignment = Enum.TextXAlignment.Left
+    quickTitle.ZIndex = Z_TEXT
     quickTitle.Parent = quickTitleBg
 
-    -- Rejoin server button
     local rejoinRow = Instance.new("Frame")
     rejoinRow.Size = UDim2.new(1, -20, 0, 36)
     rejoinRow.BackgroundTransparency = 1
+    rejoinRow.ZIndex = 65
     rejoinRow.LayoutOrder = 6
     rejoinRow.Parent = univContent
 
@@ -210,7 +214,7 @@ function UnivModule.CreateUI(parent)
     rejoinButton.Font = Enum.Font.Gotham
     rejoinButton.TextSize = 13
     rejoinButton.TextColor3 = TEXT_COL
-    rejoinButton.ZIndex = 26
+    rejoinButton.ZIndex = Z_BTN
     rejoinButton.Parent = rejoinRow
 
     local rejoinCorner = Instance.new("UICorner")
@@ -234,7 +238,6 @@ function UnivModule.CreateUI(parent)
         end)
     end)
 
-    -- Server hop button
     local hopButton = Instance.new("TextButton")
     hopButton.Size = UDim2.new(0, 160, 0, 36)
     hopButton.Position = UDim2.new(0, 170, 0, 0)
@@ -245,7 +248,7 @@ function UnivModule.CreateUI(parent)
     hopButton.Font = Enum.Font.Gotham
     hopButton.TextSize = 13
     hopButton.TextColor3 = TEXT_COL
-    hopButton.ZIndex = 26
+    hopButton.ZIndex = Z_BTN
     hopButton.Parent = rejoinRow
 
     local hopCorner = Instance.new("UICorner")
@@ -290,7 +293,6 @@ function UnivModule.CreateUI(parent)
 end
 
 function UnivModule.Cleanup()
-    -- No cleanup needed
 end
 
 return UnivModule
