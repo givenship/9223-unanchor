@@ -1,7 +1,7 @@
 -- Combat Module - Main GUI
 -- Loads Hitbox and Aimlock scripts from GitHub
 
-Print("is that dih good")
+print("is that dih good")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
