@@ -1,286 +1,335 @@
--- Auto Defuse Module (FINAL FIXED VERSION)
--- Circle: Under YOUR feet, GREEN if MONSTER in range, RED if no monsters nearby
--- Indicators: Small balls on MONSTERS only (green dot if in range)
--- Auto-click: Triggers on MONSTER bomb plant animations (after delay)
--- 100% uses 3D Parts → Always visible, no Drawing issues
+-- Auto Defuse Module
+-- Detects nearby "Monsters" team players playing specific animations
+-- then simulates a left click when detected
+-- Animation IDs: 99918936475651, 115241304811827
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
--- REPLACE WITH REAL BOMB PLANT ANIM IDs FROM GAME!
-local TARGET_ANIMATIONS = {
+local Settings = getgenv().AutoDefuseSettings or {
+    Enabled = false,
+    Delay = 0,
+    DetectionRadius = 30,
+    ShowCircle = true
+}
+getgenv().AutoDefuseSettings = Settings
+
+local TARGET_ANIM_IDS = {
     ["99918936475651"] = true,
-    ["115241304811827"] = true,
-    ["rbxassetid://99918936475651"] = true,
-    ["rbxassetid://115241304811827"] = true,
+    ["115241304811827"] = true
 }
 
--- Settings
-if not getgenv().AutoDefuseSettings then
-    getgenv().AutoDefuseSettings = {
-        Enabled = false,
-        Delay = 3000, -- ms to wait after detecting plant anim
-        ShowCircle = true,
-        DetectionRadius = 30
-    }
-end
-
-local AutoDefuse = {}
+local running = false
 local mainLoop = nil
-local circlePart = nil
-local playerParts = {} -- uid -> part
-local detectedPlayers = {}
-local clickCooldown = {}
+local trackedConnections = {}
+local circleAdornee = nil
 
--- Create flat ground circle (under feet)
-local function createMainCirclePart()
-    local part = Instance.new("Part")
-    part.Name = "AutoDefuseCircle"
-    part.Shape = Enum.PartType.Cylinder
-    part.Material = Enum.Material.ForceField
-    part.Anchored = true
-    part.CanCollide = false
-    part.TopSurface = Enum.SurfaceType.Smooth
-    part.BottomSurface = Enum.SurfaceType.Smooth
-    part.Size = Vector3.new(60, 0.2, 60) -- Default 30 radius x2
-    return part
+-- Extract numeric ID from animation content string
+-- Handles: "rbxassetid://12345", "http://www.roblox.com/asset/?id=12345", or just "12345"
+local function extractAnimId(animId)
+    if not animId then return nil end
+    local id = tostring(animId)
+    -- Match trailing number after last non-digit
+    local num = id:match("(%d+)%s*$")
+    return num
 end
 
--- Small indicator ball for monsters
-local function createPlayerIndicatorPart(uid)
-    local part = Instance.new("Part")
-    part.Name = "AutoDefuse_Ind_" .. uid
-    part.Shape = Enum.PartType.Ball
-    part.Material = Enum.Material.Neon
-    part.Anchored = true
-    part.CanCollide = false
-    part.Size = Vector3.new(1.5, 1.5, 1.5)
-    return part
+local function simulateClick()
+    -- Method 1: VirtualInputManager (most reliable in executors)
+    local success = pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+        task.defer(function()
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+        end)
+    end)
+
+    if not success then
+        -- Method 2: fireclick / mouse1click (executor-specific)
+        pcall(function()
+            if mouse1click then
+                mouse1click()
+            elseif click then
+                click()
+            end
+        end)
+    end
 end
 
 local function getLocalRoot()
     local char = LocalPlayer.Character
-    return char and char:FindFirstChild("HumanoidRootPart")
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
 end
 
-local function getPlayerRoot(player)
-    local char = player.Character
-    return char and char:FindFirstChild("HumanoidRootPart")
-end
-
--- FIXED: Detects MONSTERS (bomb planters)
 local function isMonsterTeam(player)
     if not player.Team then return false end
-    local name = player.Team.Name:lower()
-    -- Customize these based on your game teams:
-    return name:find("monster") or name:find("monsters") or 
-           name:find("terror") or name:find("t ") or 
-           name:find("red") or name:find("bomb")
+    return player.Team.Name == "Monsters"
 end
 
-local function isPlayingTargetAnimation(player)
+local function getDistance(player)
+    local localRoot = getLocalRoot()
+    if not localRoot then return math.huge end
     local char = player.Character
-    if not char then return false end
+    if not char then return math.huge end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return math.huge end
+    return (localRoot.Position - root.Position).Magnitude
+end
+
+local function getAnimator(player)
+    local char = player.Character
+    if not char then return nil end
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return false end
-    local animator = humanoid:FindFirstChildOfClass("Animator")
-    if not animator then return false end
-    for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-        local anim = track.Animation
-        if anim then
-            local id = anim.AnimationId
-            if TARGET_ANIMATIONS[id] or (id:match("%d+") and TARGET_ANIMATIONS[id:match("%d+")]) then
-                return true
+    if not humanoid then return nil end
+    return humanoid:FindFirstChildOfClass("Animator")
+end
+
+local function onAnimationPlayed(animTrack, player)
+    if not Settings.Enabled then return end
+    if not running then return end
+
+    local anim = animTrack.Animation
+    if not anim then return end
+
+    local animId = extractAnimId(anim.AnimationId)
+    if not animId then return end
+
+    if TARGET_ANIM_IDS[animId] then
+        local dist = getDistance(player)
+        if dist <= Settings.DetectionRadius then
+            print("[Auto Defuse] Detected target animation " .. animId .. " on " .. player.Name .. " (dist: " .. math.floor(dist) .. ")")
+
+            local delay = (Settings.Delay or 0) / 1000
+            if delay > 0 then
+                task.wait(delay)
+            end
+
+            if Settings.Enabled and running then
+                simulateClick()
+                print("[Auto Defuse] Click fired!")
             end
         end
     end
-    return false
 end
 
--- FIXED Click (works everywhere)
-local function doLeftClick()
-    pcall(function()
-        if mouse1click then mouse1click() return end
-        if mouse1press and mouse1release then
-            mouse1press()
-            task.wait(0.03)
-            mouse1release()
-            return
+local function trackPlayer(player)
+    if player == LocalPlayer then return end
+    if not isMonsterTeam(player) then return end
+
+    local function connectAnimator()
+        local animator = getAnimator(player)
+        if not animator then return end
+
+        -- Disconnect old connection for this player
+        if trackedConnections[player] and trackedConnections[player].animConn then
+            trackedConnections[player].animConn:Disconnect()
         end
-        warn("[AutoDefuse] Update executor for mouse1click!")
+
+        local conn = animator.AnimationPlayed:Connect(function(animTrack)
+            onAnimationPlayed(animTrack, player)
+        end)
+
+        if not trackedConnections[player] then
+            trackedConnections[player] = {}
+        end
+        trackedConnections[player].animConn = conn
+
+        -- Also check currently playing animations
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            task.spawn(function()
+                onAnimationPlayed(track, player)
+            end)
+        end
+    end
+
+    -- Connect when character spawns
+    local charConn = player.CharacterAdded:Connect(function(char)
+        task.wait(1) -- Wait for Animator to load
+        if running then
+            connectAnimator()
+        end
     end)
+
+    if not trackedConnections[player] then
+        trackedConnections[player] = {}
+    end
+    trackedConnections[player].charConn = charConn
+
+    -- Connect now if character exists
+    if player.Character then
+        task.spawn(connectAnimator)
+    end
 end
 
-local function getDistanceToPlayer(player)
-    local localRoot = getLocalRoot()
-    local otherRoot = getPlayerRoot(player)
-    if not localRoot or not otherRoot then return math.huge end
-    return (localRoot.Position - otherRoot.Position).Magnitude
+local function untrackPlayer(player)
+    local data = trackedConnections[player]
+    if not data then return end
+    if data.animConn then pcall(function() data.animConn:Disconnect() end) end
+    if data.charConn then pcall(function() data.charConn:Disconnect() end) end
+    trackedConnections[player] = nil
 end
 
-local function clearVisuals()
-    if circlePart then circlePart:Destroy() circlePart = nil end
-    for _, part in pairs(playerParts) do part:Destroy() end
-    playerParts = {}
+local function createDetectionCircle()
+    if circleAdornee then
+        pcall(function() circleAdornee:Destroy() end)
+        circleAdornee = nil
+    end
+
+    if not Settings.ShowCircle then return end
+
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+
+    local part = Instance.new("Part")
+    part.Name = "AutoDefuseRadius"
+    part.Shape = Enum.PartType.Cylinder
+    part.Size = Vector3.new(0.1, Settings.DetectionRadius * 2, Settings.DetectionRadius * 2)
+    part.CFrame = root.CFrame * CFrame.new(0, -2.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.ForceField
+    part.Color = Color3.fromRGB(184, 193, 206)
+    part.Transparency = 0.85
+    part.Parent = workspace
+
+    circleAdornee = part
+    return part
 end
 
--- MAIN CIRCLE: Under YOUR feet, GREEN=monster inside, RED=none
-local function updateDetectionCircle()
-    local settings = getgenv().AutoDefuseSettings
-    if not settings.ShowCircle then
-        if circlePart then circlePart.Parent = nil end
+local function updateCircle()
+    if not Settings.ShowCircle then
+        if circleAdornee then
+            pcall(function() circleAdornee:Destroy() end)
+            circleAdornee = nil
+        end
         return
     end
 
-    local localRoot = getLocalRoot()
-    if not localRoot then
-        if circlePart then circlePart.Parent = nil end
-        return
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    if not circleAdornee or not circleAdornee.Parent then
+        createDetectionCircle()
     end
 
-    if not circlePart then circlePart = createMainCirclePart() end
+    if circleAdornee then
+        circleAdornee.Size = Vector3.new(0.1, Settings.DetectionRadius * 2, Settings.DetectionRadius * 2)
+        circleAdornee.CFrame = root.CFrame * CFrame.new(0, -2.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+    end
+end
 
-    local radius = settings.DetectionRadius
-    circlePart.Size = Vector3.new(radius * 2, 0.2, radius * 2)
+local playerAddedConn = nil
+local playerRemovingConn = nil
+local teamChangedConns = {}
 
-    -- EXACTLY under feet
-    local pos = localRoot.Position - Vector3.new(0, 3.5, 0)
-    circlePart.CFrame = CFrame.new(pos) * CFrame.Angles(math.rad(90), 0, 0)
+local function start()
+    if running then return end
+    running = true
+    print("[Auto Defuse] Started - Monitoring Monsters team animations")
 
-    -- Check MONSTERS in range
-    local anyMonsterInRange = false
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and isMonsterTeam(player) then
-            if getDistanceToPlayer(player) <= radius then
-                anyMonsterInRange = true
-                break
+    -- Track all current Monsters team players
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            trackPlayer(player)
+
+            -- Watch for team changes
+            local conn = player:GetPropertyChangedSignal("Team"):Connect(function()
+                untrackPlayer(player)
+                if isMonsterTeam(player) and running then
+                    trackPlayer(player)
+                end
+            end)
+            teamChangedConns[player] = conn
+        end
+    end
+
+    -- Track new players joining
+    playerAddedConn = Players.PlayerAdded:Connect(function(player)
+        task.wait(0.5)
+        if not running then return end
+        trackPlayer(player)
+
+        local conn = player:GetPropertyChangedSignal("Team"):Connect(function()
+            untrackPlayer(player)
+            if isMonsterTeam(player) and running then
+                trackPlayer(player)
             end
+        end)
+        teamChangedConns[player] = conn
+    end)
+
+    -- Cleanup when players leave
+    playerRemovingConn = Players.PlayerRemoving:Connect(function(player)
+        untrackPlayer(player)
+        if teamChangedConns[player] then
+            pcall(function() teamChangedConns[player]:Disconnect() end)
+            teamChangedConns[player] = nil
         end
-    end
+    end)
 
-    -- GREEN if monster in circle, RED if not
-    if anyMonsterInRange then
-        circlePart.Color = Color3.fromRGB(0, 255, 0)  -- GREEN
-        circlePart.Transparency = 0.4
-        print("[AutoDefuse] GREEN: Monster in range!")  -- Debug (remove if annoying)
-    else
-        circlePart.Color = Color3.fromRGB(255, 50, 50)  -- RED
-        circlePart.Transparency = 0.7
-    end
+    -- Circle update loop
+    mainLoop = RunService.Heartbeat:Connect(function()
+        if not running then return end
+        updateCircle()
+    end)
 
-    circlePart.Parent = workspace
+    createDetectionCircle()
 end
 
--- Monster indicators (small balls above their heads)
-local function updatePlayerIndicators()
-    local settings = getgenv().AutoDefuseSettings
-    if not settings.ShowCircle then
-        for _, part in pairs(playerParts) do part.Parent = nil end
-        return
+local function stop()
+    if not running then return end
+    running = false
+    print("[Auto Defuse] Stopped")
+
+    -- Disconnect main loop
+    if mainLoop then
+        pcall(function() mainLoop:Disconnect() end)
+        mainLoop = nil
     end
 
-    local radius = settings.DetectionRadius * 1.2
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and isMonsterTeam(player) then
-            local otherRoot = getPlayerRoot(player)
-            if otherRoot and getDistanceToPlayer(player) <= radius then
-                local uid = player.UserId
-                local part = playerParts[uid]
-                if not part then
-                    part = createPlayerIndicatorPart(uid)
-                    playerParts[uid] = part
-                end
-
-                -- Above head
-                part.CFrame = CFrame.new(otherRoot.Position + Vector3.new(0, 7, 0))
-
-                local inRange = getDistanceToPlayer(player) <= settings.DetectionRadius
-                part.Color = inRange and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
-                part.Size = inRange and Vector3.new(2.5, 2.5, 2.5) or Vector3.new(1.5, 1.5, 1.5)
-                part.Transparency = 0.3
-                part.Parent = workspace
-
-                -- YELLOW + PULSE if planting bomb
-                if isPlayingTargetAnimation(player) then
-                    part.Color = Color3.fromRGB(255, 255, 0)
-                    part.Size = Vector3.new(4, 4, 4)
-                    part.Transparency = 0.1
-                end
-            end
-        end
+    -- Disconnect player tracking
+    if playerAddedConn then
+        pcall(function() playerAddedConn:Disconnect() end)
+        playerAddedConn = nil
+    end
+    if playerRemovingConn then
+        pcall(function() playerRemovingConn:Disconnect() end)
+        playerRemovingConn = nil
     end
 
-    -- Cleanup old parts
-    for uid, part in pairs(playerParts) do
-        local player = Players:GetPlayerByUserId(uid)
-        if not player or not getPlayerRoot(player) or getDistanceToPlayer(player) > radius then
-            part:Destroy()
-            playerParts[uid] = nil
-        end
+    -- Disconnect all tracked players
+    for player, _ in pairs(trackedConnections) do
+        untrackPlayer(player)
+    end
+
+    -- Disconnect team change watchers
+    for player, conn in pairs(teamChangedConns) do
+        pcall(function() conn:Disconnect() end)
+    end
+    teamChangedConns = {}
+
+    -- Remove circle
+    if circleAdornee then
+        pcall(function() circleAdornee:Destroy() end)
+        circleAdornee = nil
     end
 end
 
-local function mainLoopFunc()
-    local settings = getgenv().AutoDefuseSettings
-    if not settings.Enabled then return end
+-- Expose control interface (same pattern as Hitbox/Aimlock)
+getgenv().AutoDefuseControl = {
+    Start = start,
+    Stop = stop
+}
 
-    updateDetectionCircle()
-    updatePlayerIndicators()
-
-    local radius = settings.DetectionRadius
-    local delayMs = settings.Delay
-
-    -- DETECT MONSTER bomb plants & auto-defuse
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and isMonsterTeam(player) and getDistanceToPlayer(player) <= radius then
-            local uid = player.UserId
-            local isPlanting = isPlayingTargetAnimation(player)
-
-            if isPlanting then
-                if not detectedPlayers[uid] then
-                    detectedPlayers[uid] = tick() * 1000
-                    print("[AutoDefuse] Monster planting:", player.Name)
-                end
-
-                local elapsed = (tick() * 1000) - detectedPlayers[uid]
-                if elapsed >= delayMs then
-                    if not clickCooldown[uid] or (tick() - clickCooldown[uid]) > 1 then
-                        doLeftClick()
-                        clickCooldown[uid] = tick()
-                        print("[AutoDefuse] DEFUSED! Monster:", player.Name, "Dist:", math.floor(getDistanceToPlayer(player)))
-                    end
-                end
-            else
-                detectedPlayers[uid] = nil
-            end
-        else
-            detectedPlayers[player.UserId] = nil
-        end
-    end
+-- Auto-start if settings say enabled
+if Settings.Enabled then
+    start()
 end
 
-function AutoDefuse.Start()
-    getgenv().AutoDefuseSettings.Enabled = true
-    if mainLoop then mainLoop:Disconnect() end
-    detectedPlayers = {}
-    clickCooldown = {}
-    clearVisuals()
-
-    mainLoop = RunService.RenderStepped:Connect(pcall(mainLoopFunc))
-    print("🟢 [AutoDefuse] STARTED - Circle under feet: GREEN=Monster inside!")
-end
-
-function AutoDefuse.Stop()
-    getgenv().AutoDefuseSettings.Enabled = false
-    if mainLoop then mainLoop:Disconnect() mainLoop = nil end
-    clearVisuals()
-    detectedPlayers = {}
-    clickCooldown = {}
-    print("🔴 [AutoDefuse] STOPPED")
-end
-
-getgenv().AutoDefuseControl = AutoDefuse
-return AutoDefuse
+print("[Auto Defuse] Module loaded - Targets: Monsters team, Anim IDs: 99918936475651, 115241304811827")
