@@ -7,14 +7,23 @@ local RunService = game:GetService("RunService")
 
 local MiscModule = {}
 
-local TEXT_COL = Color3.fromRGB(0, 0, 0)
+local TEXT_COL = Color3.fromRGB(184, 193, 206)
 local BTN_OFF = Color3.fromRGB(255, 255, 255)
-local BTN_ON = Color3.fromRGB(240, 220, 230)
+local BTN_ON = Color3.fromRGB(184, 193, 206)
 local SLIDER_BG = Color3.fromRGB(255, 255, 255)
-local SLIDER_FILL = Color3.fromRGB(0, 0, 0)
+local SLIDER_FILL = Color3.fromRGB(184, 193, 206)
 local CHECK_OFF = Color3.fromRGB(180, 180, 180)
 local CHECK_ON = Color3.fromRGB(255, 255, 255)
 local TXT_BG = Color3.fromRGB(255, 255, 255)
+
+local function addPadding(frame, lr, tb)
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, lr or 4)
+    pad.PaddingRight = UDim.new(0, lr or 4)
+    pad.PaddingTop = UDim.new(0, tb or 0)
+    pad.PaddingBottom = UDim.new(0, tb or 0)
+    pad.Parent = frame
+end
 
 local ToolURLs = {
     MoveTool = "https://raw.githubusercontent.com/givenship/Unanchor.euva/refs/heads/main/MoveTool",
@@ -58,16 +67,18 @@ function MiscModule.CreateUI(parent)
     -- Section title with white background
     local function createSectionTitle(text, position)
         local bg = Instance.new("Frame")
-        bg.Size = UDim2.new(1, -20, 0, 28)
+        bg.Size = UDim2.new(0, 0, 0, 28)
+        bg.AutomaticSize = Enum.AutomaticSize.X
         bg.Position = UDim2.new(0, 10, 0, position)
         bg.BackgroundColor3 = TXT_BG
         bg.BorderSizePixel = 0
         bg.ZIndex = 66
         bg.Parent = miscContent
+        addPadding(bg, 6, 0)
 
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, -8, 1, 0)
-        label.Position = UDim2.new(0, 4, 0, 0)
+        label.Size = UDim2.new(0, 0, 1, 0)
+        label.AutomaticSize = Enum.AutomaticSize.X
         label.BackgroundTransparency = 1
         label.Text = text
         label.Font = Enum.Font.GothamBold
@@ -93,10 +104,6 @@ function MiscModule.CreateUI(parent)
         button.ZIndex = 68
         button.Parent = miscContent
 
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 6)
-        corner.Parent = button
-
         button.MouseEnter:Connect(function() button.BackgroundColor3 = BTN_ON end)
         button.MouseLeave:Connect(function()
             -- Only revert if not in "enabled" state
@@ -120,16 +127,18 @@ function MiscModule.CreateUI(parent)
         container.Parent = miscContent
 
         local labelBg = Instance.new("Frame")
-        labelBg.Size = UDim2.new(0, 120, 0, 20)
+        labelBg.Size = UDim2.new(0, 0, 0, 20)
         labelBg.Position = UDim2.new(0, 0, 0, 5)
+        labelBg.AutomaticSize = Enum.AutomaticSize.X
         labelBg.BackgroundColor3 = TXT_BG
         labelBg.BorderSizePixel = 0
         labelBg.ZIndex = 66
         labelBg.Parent = container
+        addPadding(labelBg, 4, 0)
 
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, -4, 1, 0)
-        label.Position = UDim2.new(0, 2, 0, 0)
+        label.Size = UDim2.new(0, 0, 1, 0)
+        label.AutomaticSize = Enum.AutomaticSize.X
         label.BackgroundTransparency = 1
         label.Text = name .. ": " .. currentValue
         label.Font = Enum.Font.Gotham
@@ -346,16 +355,18 @@ function MiscModule.CreateUI(parent)
 
     -- Spin Axis Selector
     local axisLabelBg = Instance.new("Frame")
-    axisLabelBg.Size = UDim2.new(1, -20, 0, 25)
+    axisLabelBg.Size = UDim2.new(0, 0, 0, 25)
+    axisLabelBg.AutomaticSize = Enum.AutomaticSize.X
     axisLabelBg.Position = UDim2.new(0, 10, 0, yPos)
     axisLabelBg.BackgroundColor3 = TXT_BG
     axisLabelBg.BorderSizePixel = 0
     axisLabelBg.ZIndex = 66
     axisLabelBg.Parent = miscContent
+    addPadding(axisLabelBg, 6, 0)
 
     local axisLabel = Instance.new("TextLabel")
-    axisLabel.Size = UDim2.new(1, -8, 1, 0)
-    axisLabel.Position = UDim2.new(0, 4, 0, 0)
+    axisLabel.Size = UDim2.new(0, 0, 1, 0)
+    axisLabel.AutomaticSize = Enum.AutomaticSize.X
     axisLabel.BackgroundTransparency = 1
     axisLabel.Text = "Spin Axis:"
     axisLabel.Font = Enum.Font.Gotham
@@ -379,10 +390,6 @@ function MiscModule.CreateUI(parent)
     verticalBtn.ZIndex = 68
     verticalBtn.Parent = miscContent
 
-    local vc = Instance.new("UICorner")
-    vc.CornerRadius = UDim.new(0, 6)
-    vc.Parent = verticalBtn
-
     local horizontalBtn = Instance.new("TextButton")
     horizontalBtn.Size = UDim2.new(0, 135, 0, 30)
     horizontalBtn.Position = UDim2.new(0, 155, 0, yPos)
@@ -395,10 +402,6 @@ function MiscModule.CreateUI(parent)
     horizontalBtn.AutoButtonColor = false
     horizontalBtn.ZIndex = 68
     horizontalBtn.Parent = miscContent
-
-    local hc = Instance.new("UICorner")
-    hc.CornerRadius = UDim.new(0, 6)
-    hc.Parent = horizontalBtn
 
     verticalBtn.MouseButton1Click:Connect(function()
         if LoadedTools.RPMTool then LoadedTools.RPMTool.SetAxis("Vertical") end
@@ -532,9 +535,6 @@ function MiscModule.CreateUI(parent)
     flipCheckbox.ZIndex = 68
     flipCheckbox.Parent = flipContainer
 
-    local fcc = Instance.new("UICorner")
-    fcc.CornerRadius = UDim.new(0, 4)
-    fcc.Parent = flipCheckbox
 
     local checkmark = Instance.new("TextLabel")
     checkmark.Size = UDim2.new(1, 0, 1, 0)
@@ -547,16 +547,18 @@ function MiscModule.CreateUI(parent)
     checkmark.Parent = flipCheckbox
 
     local flipLabelBg = Instance.new("Frame")
-    flipLabelBg.Size = UDim2.new(1, -35, 1, 0)
+    flipLabelBg.Size = UDim2.new(0, 0, 1, 0)
+    flipLabelBg.AutomaticSize = Enum.AutomaticSize.X
     flipLabelBg.Position = UDim2.new(0, 35, 0, 0)
     flipLabelBg.BackgroundColor3 = TXT_BG
     flipLabelBg.BorderSizePixel = 0
     flipLabelBg.ZIndex = 66
     flipLabelBg.Parent = flipContainer
+    addPadding(flipLabelBg, 6, 0)
 
     local flipLabel = Instance.new("TextLabel")
-    flipLabel.Size = UDim2.new(1, -8, 1, 0)
-    flipLabel.Position = UDim2.new(0, 4, 0, 0)
+    flipLabel.Size = UDim2.new(0, 0, 1, 0)
+    flipLabel.AutomaticSize = Enum.AutomaticSize.X
     flipLabel.BackgroundTransparency = 1
     flipLabel.Text = "Flip Player"
     flipLabel.Font = Enum.Font.Gotham
