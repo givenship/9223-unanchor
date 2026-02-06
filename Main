@@ -23,6 +23,7 @@ local TabModuleURLs = {
     Combat   = BASE_URL .. "Combat",
     Player   = BASE_URL .. "Player",
     Misc     = BASE_URL .. "Misc",
+    Univ     = BASE_URL .. "Univ",
     Settings = BASE_URL .. "Settings",
 }
 
@@ -97,21 +98,7 @@ Deco.Theme = Theme
 
 print("[Euva] Building GUI...")
 
-print("[Euva] About to call Layout.Create...")
-local createOk, createErr = pcall(function()
-    Layout.Create(CoreGui)
-end)
-
-if not createOk then
-    warn("[Euva] Layout.Create failed:", createErr)
-    
-    -- Try to identify the issue
-    print("[Euva] Testing APIs...")
-    print("  CoreGui:", CoreGui)
-    print("  Lighting:", game:GetService("Lighting"))
-    print("  BlurEffect:", pcall(function() return Instance.new("BlurEffect") end))
-    print("  GetGuiObjectsAtPosition:", CoreGui.GetGuiObjectsAtPosition)
-end
+Layout.Create(CoreGui)
 
 -- Create decorations
 Deco.Create(Layout.MainFrame, Layout.ContentArea)
@@ -122,7 +109,7 @@ Deco.Create(Layout.MainFrame, Layout.ContentArea)
 
 local LoadedTabs = {}
 
-local tabOrder = {"Visual", "Combat", "Player", "Misc", "Settings"}
+local tabOrder = {"Visual", "Combat", "Player", "Misc", "Univ", "Settings"}
 
 for _, tabName in ipairs(tabOrder) do
     -- Create tab in layout
@@ -131,27 +118,34 @@ for _, tabName in ipairs(tabOrder) do
     -- Load tab module from GitHub
     local tabModule = loadModule(tabName, TabModuleURLs[tabName])
 
-    if tabModule and tabModule.CreateUI then
-        local ok, err = pcall(function()
-            tabModule.CreateUI(tabFrame)
-        end)
-
-        if not ok then
-            warn("[Euva] Failed to create UI for " .. tabName .. ": " .. tostring(err))
-            local errorLabel = Instance.new("TextLabel")
-            errorLabel.Size = UDim2.new(1, -20, 0, 40)
-            errorLabel.Position = UDim2.new(0, 10, 0, 10)
-            errorLabel.BackgroundTransparency = 1
-            errorLabel.Text = "Failed to load " .. tabName .. " module"
-            errorLabel.Font = Enum.Font.Gotham
-            errorLabel.TextSize = 14
-            errorLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            errorLabel.TextXAlignment = Enum.TextXAlignment.Left
-            errorLabel.TextWrapped = true
-            errorLabel.Parent = tabFrame
+    if tabModule then
+        -- Wire Layout reference for Settings transparency slider
+        if tabName == "Settings" and tabModule then
+            tabModule.Layout = Layout
         end
 
-        LoadedTabs[tabName] = tabModule
+        if tabModule.CreateUI then
+            local ok, err = pcall(function()
+                tabModule.CreateUI(tabFrame)
+            end)
+
+            if not ok then
+                warn("[Euva] Failed to create UI for " .. tabName .. ": " .. tostring(err))
+                local errorLabel = Instance.new("TextLabel")
+                errorLabel.Size = UDim2.new(1, -20, 0, 40)
+                errorLabel.Position = UDim2.new(0, 10, 0, 10)
+                errorLabel.BackgroundTransparency = 1
+                errorLabel.Text = "Failed to load " .. tabName .. " module"
+                errorLabel.Font = Enum.Font.Gotham
+                errorLabel.TextSize = 14
+                errorLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                errorLabel.TextXAlignment = Enum.TextXAlignment.Left
+                errorLabel.TextWrapped = true
+                errorLabel.Parent = tabFrame
+            end
+
+            LoadedTabs[tabName] = tabModule
+        end
     else
         local errorLabel = Instance.new("TextLabel")
         errorLabel.Size = UDim2.new(1, -20, 0, 40)
@@ -189,12 +183,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.RightShift then
         if Layout.MainFrame then
             Layout.MainFrame.Visible = not Layout.MainFrame.Visible
-
-            -- Also toggle outer lines
-            local outerLines = Layout.Gui:FindFirstChild("OuterLines")
-            if outerLines then
-                outerLines.Visible = Layout.MainFrame.Visible
-            end
 
             -- Toggle blur
             if Layout.Blur then
