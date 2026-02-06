@@ -64,7 +64,15 @@ local function watchPlayer(player)
             if not a then return end
             local id = extractId(a.AnimationId)
             if id and ANIM_IDS[id] and inRange(player) then
-                print("[AutoDefuse] " .. player.Name .. " anim " .. id .. " -> click")
+                local delay = 0
+                if getgenv().AutoDefuseSettings then
+                    delay = (getgenv().AutoDefuseSettings.Delay or 0) / 1000
+                end
+                if delay > 0 then
+                    task.wait(delay)
+                end
+                if not running then return end
+                print("[AutoDefuse] " .. player.Name .. " anim " .. id .. " -> click (delay " .. (delay * 1000) .. "ms)")
                 click()
             end
         end)
