@@ -97,7 +97,21 @@ Deco.Theme = Theme
 
 print("[Euva] Building GUI...")
 
-Layout.Create(CoreGui)
+print("[Euva] About to call Layout.Create...")
+local createOk, createErr = pcall(function()
+    Layout.Create(CoreGui)
+end)
+
+if not createOk then
+    warn("[Euva] Layout.Create failed:", createErr)
+    
+    -- Try to identify the issue
+    print("[Euva] Testing APIs...")
+    print("  CoreGui:", CoreGui)
+    print("  Lighting:", game:GetService("Lighting"))
+    print("  BlurEffect:", pcall(function() return Instance.new("BlurEffect") end))
+    print("  GetGuiObjectsAtPosition:", CoreGui.GetGuiObjectsAtPosition)
+end
 
 -- Create decorations
 Deco.Create(Layout.MainFrame, Layout.ContentArea)
