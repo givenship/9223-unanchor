@@ -4,9 +4,11 @@
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 local SettingsModule = {}
+SettingsModule.Layout = nil -- Set by Main before CreateUI
 
 function SettingsModule.CreateUI(parent)
     local settingsContent = Instance.new("ScrollingFrame")
@@ -24,32 +26,156 @@ function SettingsModule.CreateUI(parent)
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = settingsContent
 
+    local LABEL_BG = Color3.fromRGB(240, 220, 230)
+    local TEXT_COL = Color3.fromRGB(0, 0, 0)
+
+    -- ============================================
+    -- GUI TRANSPARENCY
+    -- ============================================
+
+    local transTitle = Instance.new("Frame")
+    transTitle.Size = UDim2.new(1, -20, 0, 28)
+    transTitle.BackgroundColor3 = LABEL_BG
+    transTitle.BorderSizePixel = 0
+    transTitle.LayoutOrder = 0
+    transTitle.Parent = settingsContent
+
+    local transTitleText = Instance.new("TextLabel")
+    transTitleText.Size = UDim2.new(1, -8, 1, 0)
+    transTitleText.Position = UDim2.new(0, 4, 0, 0)
+    transTitleText.BackgroundTransparency = 1
+    transTitleText.Text = "GUI TRANSPARENCY"
+    transTitleText.Font = Enum.Font.GothamBold
+    transTitleText.TextSize = 15
+    transTitleText.TextColor3 = TEXT_COL
+    transTitleText.TextXAlignment = Enum.TextXAlignment.Left
+    transTitleText.Parent = transTitle
+
+    -- Current value label
+    local defaultTrans = 0.1
+    if SettingsModule.Layout and SettingsModule.Layout.GetGuiTransparency then
+        defaultTrans = SettingsModule.Layout.GetGuiTransparency()
+    end
+
+    local transValueBg = Instance.new("Frame")
+    transValueBg.Size = UDim2.new(1, -20, 0, 24)
+    transValueBg.BackgroundColor3 = LABEL_BG
+    transValueBg.BorderSizePixel = 0
+    transValueBg.LayoutOrder = 1
+    transValueBg.Parent = settingsContent
+
+    local transValueLabel = Instance.new("TextLabel")
+    transValueLabel.Size = UDim2.new(1, -8, 1, 0)
+    transValueLabel.Position = UDim2.new(0, 4, 0, 0)
+    transValueLabel.BackgroundTransparency = 1
+    transValueLabel.Text = "Transparency: " .. math.floor(defaultTrans * 100) .. "%"
+    transValueLabel.Font = Enum.Font.Gotham
+    transValueLabel.TextSize = 13
+    transValueLabel.TextColor3 = TEXT_COL
+    transValueLabel.TextXAlignment = Enum.TextXAlignment.Left
+    transValueLabel.LayoutOrder = 1
+    transValueLabel.Parent = transValueBg
+
+    -- Slider track
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(1, -20, 0, 30)
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(200, 180, 190)
+    sliderFrame.BorderSizePixel = 0
+    sliderFrame.LayoutOrder = 2
+    sliderFrame.Parent = settingsContent
+
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 6)
+    sliderCorner.Parent = sliderFrame
+
+    local normalized = math.clamp(defaultTrans, 0, 1)
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(normalized, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(244, 167, 187)
+    fill.BorderSizePixel = 0
+    fill.ZIndex = 27
+    fill.Parent = sliderFrame
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 6)
+    fillCorner.Parent = fill
+
+    local knob = Instance.new("TextButton")
+    knob.Size = UDim2.new(0, 20, 0, 20)
+    knob.Position = UDim2.new(1, -10, 0.5, -10)
+    knob.AnchorPoint = Vector2.new(1, 0)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Text = ""
+    knob.ZIndex = 28
+    knob.Parent = fill
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = knob
+
+    local dragging = false
+
+    knob.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+        if not dragging then return end
+
+        local mouseX = UserInputService:GetMouseLocation().X
+        local x0 = sliderFrame.AbsolutePosition.X
+        local w = sliderFrame.AbsoluteSize.X
+        local rel = math.clamp((mouseX - x0) / w, 0, 1)
+
+        fill.Size = UDim2.new(rel, 0, 1, 0)
+        transValueLabel.Text = "Transparency: " .. math.floor(rel * 100) .. "%"
+
+        if SettingsModule.Layout and SettingsModule.Layout.SetGuiTransparency then
+            SettingsModule.Layout.SetGuiTransparency(rel)
+        end
+    end)
+
     -- ============================================
     -- SCRIPT MANAGEMENT
     -- ============================================
 
+    local reloadTitleBg = Instance.new("Frame")
+    reloadTitleBg.Size = UDim2.new(1, -20, 0, 28)
+    reloadTitleBg.BackgroundColor3 = LABEL_BG
+    reloadTitleBg.BorderSizePixel = 0
+    reloadTitleBg.LayoutOrder = 3
+    reloadTitleBg.Parent = settingsContent
+
     local reloadTitle = Instance.new("TextLabel")
-    reloadTitle.Size = UDim2.new(1, -20, 0, 30)
+    reloadTitle.Size = UDim2.new(1, -8, 1, 0)
+    reloadTitle.Position = UDim2.new(0, 4, 0, 0)
     reloadTitle.BackgroundTransparency = 1
     reloadTitle.Text = "SCRIPT MANAGEMENT"
     reloadTitle.Font = Enum.Font.GothamBold
     reloadTitle.TextSize = 15
-    reloadTitle.TextColor3 = Color3.fromRGB(60, 50, 55)
+    reloadTitle.TextColor3 = TEXT_COL
     reloadTitle.TextXAlignment = Enum.TextXAlignment.Left
-    reloadTitle.LayoutOrder = 1
-    reloadTitle.Parent = settingsContent
+    reloadTitle.Parent = reloadTitleBg
 
     -- Reload button
     local reloadButton = Instance.new("TextButton")
     reloadButton.Size = UDim2.new(1, -20, 0, 42)
-    reloadButton.BackgroundColor3 = Color3.fromRGB(240, 220, 230)
+    reloadButton.BackgroundColor3 = LABEL_BG
     reloadButton.BorderSizePixel = 0
     reloadButton.Text = "Reload Script"
     reloadButton.Font = Enum.Font.GothamBold
     reloadButton.TextSize = 14
-    reloadButton.TextColor3 = Color3.fromRGB(60, 50, 55)
+    reloadButton.TextColor3 = TEXT_COL
     reloadButton.AutoButtonColor = false
-    reloadButton.LayoutOrder = 2
+    reloadButton.LayoutOrder = 4
     reloadButton.Parent = settingsContent
 
     local reloadCorner = Instance.new("UICorner")
@@ -60,7 +186,7 @@ function SettingsModule.CreateUI(parent)
         reloadButton.BackgroundColor3 = Color3.fromRGB(250, 230, 240)
     end)
     reloadButton.MouseLeave:Connect(function()
-        reloadButton.BackgroundColor3 = Color3.fromRGB(240, 220, 230)
+        reloadButton.BackgroundColor3 = LABEL_BG
     end)
 
     reloadButton.MouseButton1Click:Connect(function()
@@ -69,7 +195,6 @@ function SettingsModule.CreateUI(parent)
 
         task.wait(0.5)
 
-        -- Destroy existing GUI
         for _, gui in pairs(CoreGui:GetChildren()) do
             if gui.Name == "EuvaMainGUI" then
                 gui:Destroy()
@@ -82,72 +207,107 @@ function SettingsModule.CreateUI(parent)
         print("[Euva] GUI destroyed - Please re-execute your script")
     end)
 
+    local reloadNoteBg = Instance.new("Frame")
+    reloadNoteBg.Size = UDim2.new(1, -20, 0, 30)
+    reloadNoteBg.BackgroundColor3 = LABEL_BG
+    reloadNoteBg.BorderSizePixel = 0
+    reloadNoteBg.LayoutOrder = 5
+    reloadNoteBg.Parent = settingsContent
+
     local reloadNote = Instance.new("TextLabel")
-    reloadNote.Size = UDim2.new(1, -20, 0, 30)
+    reloadNote.Size = UDim2.new(1, -8, 1, 0)
+    reloadNote.Position = UDim2.new(0, 4, 0, 0)
     reloadNote.BackgroundTransparency = 1
     reloadNote.Text = "This will close the GUI. Re-execute your script to reload."
     reloadNote.Font = Enum.Font.Gotham
     reloadNote.TextSize = 11
-    reloadNote.TextColor3 = Color3.fromRGB(120, 110, 115)
+    reloadNote.TextColor3 = TEXT_COL
     reloadNote.TextXAlignment = Enum.TextXAlignment.Left
     reloadNote.TextWrapped = true
-    reloadNote.LayoutOrder = 3
-    reloadNote.Parent = settingsContent
+    reloadNote.Parent = reloadNoteBg
 
     -- ============================================
     -- KEYBINDS
     -- ============================================
 
+    local keybindsTitleBg = Instance.new("Frame")
+    keybindsTitleBg.Size = UDim2.new(1, -20, 0, 28)
+    keybindsTitleBg.BackgroundColor3 = LABEL_BG
+    keybindsTitleBg.BorderSizePixel = 0
+    keybindsTitleBg.LayoutOrder = 6
+    keybindsTitleBg.Parent = settingsContent
+
     local keybindsTitle = Instance.new("TextLabel")
-    keybindsTitle.Size = UDim2.new(1, -20, 0, 30)
+    keybindsTitle.Size = UDim2.new(1, -8, 1, 0)
+    keybindsTitle.Position = UDim2.new(0, 4, 0, 0)
     keybindsTitle.BackgroundTransparency = 1
     keybindsTitle.Text = "KEYBINDS"
     keybindsTitle.Font = Enum.Font.GothamBold
     keybindsTitle.TextSize = 15
-    keybindsTitle.TextColor3 = Color3.fromRGB(60, 50, 55)
+    keybindsTitle.TextColor3 = TEXT_COL
     keybindsTitle.TextXAlignment = Enum.TextXAlignment.Left
-    keybindsTitle.LayoutOrder = 4
-    keybindsTitle.Parent = settingsContent
+    keybindsTitle.Parent = keybindsTitleBg
+
+    local keybindInfoBg = Instance.new("Frame")
+    keybindInfoBg.Size = UDim2.new(1, -20, 0, 50)
+    keybindInfoBg.BackgroundColor3 = LABEL_BG
+    keybindInfoBg.BorderSizePixel = 0
+    keybindInfoBg.LayoutOrder = 7
+    keybindInfoBg.Parent = settingsContent
 
     local keybindInfo = Instance.new("TextLabel")
-    keybindInfo.Size = UDim2.new(1, -20, 0, 50)
+    keybindInfo.Size = UDim2.new(1, -8, 1, 0)
+    keybindInfo.Position = UDim2.new(0, 4, 0, 0)
     keybindInfo.BackgroundTransparency = 1
     keybindInfo.Text = "Right Shift - Toggle GUI Visibility\n\nPress Right Shift to hide/show the GUI"
     keybindInfo.Font = Enum.Font.Gotham
     keybindInfo.TextSize = 12
-    keybindInfo.TextColor3 = Color3.fromRGB(80, 70, 75)
+    keybindInfo.TextColor3 = TEXT_COL
     keybindInfo.TextXAlignment = Enum.TextXAlignment.Left
     keybindInfo.TextWrapped = true
-    keybindInfo.LayoutOrder = 5
-    keybindInfo.Parent = settingsContent
+    keybindInfo.Parent = keybindInfoBg
 
     -- ============================================
     -- INFORMATION
     -- ============================================
 
+    local infoTitleBg = Instance.new("Frame")
+    infoTitleBg.Size = UDim2.new(1, -20, 0, 28)
+    infoTitleBg.BackgroundColor3 = LABEL_BG
+    infoTitleBg.BorderSizePixel = 0
+    infoTitleBg.LayoutOrder = 8
+    infoTitleBg.Parent = settingsContent
+
     local infoTitle = Instance.new("TextLabel")
-    infoTitle.Size = UDim2.new(1, -20, 0, 30)
+    infoTitle.Size = UDim2.new(1, -8, 1, 0)
+    infoTitle.Position = UDim2.new(0, 4, 0, 0)
     infoTitle.BackgroundTransparency = 1
     infoTitle.Text = "INFORMATION"
     infoTitle.Font = Enum.Font.GothamBold
     infoTitle.TextSize = 15
-    infoTitle.TextColor3 = Color3.fromRGB(60, 50, 55)
+    infoTitle.TextColor3 = TEXT_COL
     infoTitle.TextXAlignment = Enum.TextXAlignment.Left
-    infoTitle.LayoutOrder = 6
-    infoTitle.Parent = settingsContent
+    infoTitle.Parent = infoTitleBg
+
+    local infoTextBg = Instance.new("Frame")
+    infoTextBg.Size = UDim2.new(1, -20, 0, 100)
+    infoTextBg.BackgroundColor3 = LABEL_BG
+    infoTextBg.BorderSizePixel = 0
+    infoTextBg.LayoutOrder = 9
+    infoTextBg.Parent = settingsContent
 
     local infoText = Instance.new("TextLabel")
-    infoText.Size = UDim2.new(1, -20, 0, 100)
+    infoText.Size = UDim2.new(1, -8, 1, 0)
+    infoText.Position = UDim2.new(0, 4, 0, 0)
     infoText.BackgroundTransparency = 1
-    infoText.Text = "Euva GUI v2.0\n\nFeatures:\n- Combat: Hitbox, Aimlock, Auto Defuse\n- Visual: ESP, Health Bars, Object ESP\n- Player: Reset, JumpHeight, Noclip, Invisible\n- Misc: MoveTool, RotateTool, RingShape, RPM, Safe-NOS\n- Settings: Script Management"
+    infoText.Text = "Euva GUI v2.1\n\nFeatures:\n- Combat: Hitbox, Aimlock, Auto Defuse\n- Visual: ESP, Health Bars, Object ESP\n- Player: Reset, JumpHeight, Noclip\n- Misc: MoveTool, RotateTool, RingShape, RPM, Safe-NOS\n- Univ: Server Join\n- Settings: Transparency, Script Management"
     infoText.Font = Enum.Font.Gotham
     infoText.TextSize = 12
-    infoText.TextColor3 = Color3.fromRGB(80, 70, 75)
+    infoText.TextColor3 = TEXT_COL
     infoText.TextXAlignment = Enum.TextXAlignment.Left
     infoText.TextYAlignment = Enum.TextYAlignment.Top
     infoText.TextWrapped = true
-    infoText.LayoutOrder = 7
-    infoText.Parent = settingsContent
+    infoText.Parent = infoTextBg
 end
 
 function SettingsModule.Cleanup()
