@@ -162,6 +162,88 @@ for _, tabName in ipairs(tabOrder) do
 end
 
 -- ============================================
+-- STYLE PATCHER (fixes fonts/colors in all modules)
+-- ============================================
+
+local STYLE_BLACK = Color3.fromRGB(0, 0, 0)
+local STYLE_BTN_OFF = Color3.fromRGB(255, 255, 255)
+local STYLE_BTN_ON = Color3.fromRGB(240, 220, 230)
+
+local function patchStyles()
+    for _, obj in ipairs(Layout.Gui:GetDescendants()) do
+        -- Fix all TextLabel fonts and color
+        if obj:IsA("TextLabel") then
+            if obj.Font ~= Enum.Font.GothamBold then
+                obj.Font = Enum.Font.Gotham
+            end
+            -- Skip Discord button's white text
+            if obj.Parent and obj.Parent.Name ~= "Discord" then
+                obj.TextColor3 = STYLE_BLACK
+            end
+        end
+
+        -- Fix all TextBox fonts and color
+        if obj:IsA("TextBox") then
+            obj.Font = Enum.Font.Gotham
+            obj.TextColor3 = STYLE_BLACK
+        end
+
+        -- Fix all TextButton fonts, text color, and background
+        if obj:IsA("TextButton") then
+            -- Keep bold buttons bold, make others Gotham
+            if obj.Font ~= Enum.Font.GothamBold then
+                obj.Font = Enum.Font.Gotham
+            end
+
+            -- Skip special buttons: Discord, close, minimize, [Copy], empty text (slider knobs)
+            local txt = obj.Text
+            local skip = (txt == "Discord" or txt == "×" or txt == "−" or txt == "+"
+                or txt == "[Copy]" or txt == "")
+
+            if not skip then
+                obj.TextColor3 = STYLE_BLACK
+
+                -- Button color: white when disabled/off, F0DCE6 when enabled/on
+                local lower = string.lower(txt)
+                if string.find(lower, "disabled") or string.find(lower, "off") then
+                    obj.BackgroundColor3 = STYLE_BTN_OFF
+                elseif string.find(lower, "enabled") or string.find(lower, "on")
+                    or obj.BackgroundColor3 == Color3.fromRGB(30, 144, 255)
+                    or obj.BackgroundColor3 == Color3.fromRGB(255, 0, 0)
+                    or obj.BackgroundColor3 == Color3.fromRGB(0, 170, 0) then
+                    obj.BackgroundColor3 = STYLE_BTN_ON
+                end
+
+                -- Gray buttons (60,60,60) → white
+                if obj.BackgroundColor3 == Color3.fromRGB(60, 60, 60)
+                    or obj.BackgroundColor3 == Color3.fromRGB(80, 80, 80)
+                    or obj.BackgroundColor3 == Color3.fromRGB(100, 100, 100) then
+                    obj.BackgroundColor3 = STYLE_BTN_OFF
+                end
+
+                -- Red buttons → F0DCE6
+                if obj.BackgroundColor3 == Color3.fromRGB(255, 0, 0)
+                    or obj.BackgroundColor3 == Color3.fromRGB(200, 50, 50)
+                    or obj.BackgroundColor3 == Color3.fromRGB(220, 50, 50) then
+                    obj.BackgroundColor3 = STYLE_BTN_ON
+                end
+            end
+        end
+    end
+end
+
+-- Patch once after all tabs are built
+patchStyles()
+
+-- Keep patching every 0.5s so button state changes stay styled
+task.spawn(function()
+    while Layout.Gui and Layout.Gui.Parent do
+        patchStyles()
+        task.wait(0.5)
+    end
+end)
+
+-- ============================================
 -- PLAY INTRO ANIMATION
 -- ============================================
 
