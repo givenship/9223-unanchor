@@ -449,5 +449,5 @@ if getgenv().AutoFarmSettings and getgenv().AutoFarmSettings.Enabled then
     start()
 end
 
-print("[AutoFarm] Loaded")
+print("[AutoFarm] dsfeewtrew")
 return getgenv().AutoFarmControl
