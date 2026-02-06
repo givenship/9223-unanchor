@@ -606,6 +606,195 @@ function MiscModule.CreateUI(parent)
     aasInfo.Parent = aasInfoBg
     yPos = yPos + 50
 
+    -- ============================================
+    -- RAGDOLL CONTROL
+    -- ============================================
+    yPos = yPos + 10
+    yPos = createSectionTitle("RAGDOLL CONTROL", yPos)
+
+    -- Force Ragdoll button
+    local ragdollBtn = Instance.new("TextButton")
+    ragdollBtn.Size = UDim2.new(1, -20, 0, 35)
+    ragdollBtn.Position = UDim2.new(0, 10, 0, yPos)
+    ragdollBtn.BackgroundColor3 = BTN_OFF
+    ragdollBtn.BorderSizePixel = 0
+    ragdollBtn.AutoButtonColor = false
+    ragdollBtn.Text = "Force Ragdoll"
+    ragdollBtn.Font = Enum.Font.Gotham
+    ragdollBtn.TextSize = 14
+    ragdollBtn.TextColor3 = TEXT_COL
+    ragdollBtn.ZIndex = 68
+    ragdollBtn.Parent = miscContent
+
+    ragdollBtn.MouseEnter:Connect(function() ragdollBtn.BackgroundColor3 = BTN_ON end)
+    ragdollBtn.MouseLeave:Connect(function() ragdollBtn.BackgroundColor3 = BTN_OFF end)
+
+    ragdollBtn.MouseButton1Click:Connect(function()
+        local LP = game:GetService("Players").LocalPlayer
+        local char = LP.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+
+        -- strip velocity first
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+
+        -- disable motors to ragdoll
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("Motor6D") and v.Name ~= "Neck" then
+                v.Enabled = false
+            end
+        end
+
+        hum:ChangeState(Enum.HumanoidStateType.Physics)
+        ragdollBtn.Text = "Ragdolled!"
+        ragdollBtn.BackgroundColor3 = BTN_ON
+        task.wait(0.5)
+        ragdollBtn.Text = "Force Ragdoll"
+        ragdollBtn.BackgroundColor3 = BTN_OFF
+    end)
+    yPos = yPos + 42
+
+    -- Recover button
+    local recoverBtn = Instance.new("TextButton")
+    recoverBtn.Size = UDim2.new(1, -20, 0, 35)
+    recoverBtn.Position = UDim2.new(0, 10, 0, yPos)
+    recoverBtn.BackgroundColor3 = BTN_OFF
+    recoverBtn.BorderSizePixel = 0
+    recoverBtn.AutoButtonColor = false
+    recoverBtn.Text = "Recover (Get Up)"
+    recoverBtn.Font = Enum.Font.Gotham
+    recoverBtn.TextSize = 14
+    recoverBtn.TextColor3 = TEXT_COL
+    recoverBtn.ZIndex = 68
+    recoverBtn.Parent = miscContent
+
+    recoverBtn.MouseEnter:Connect(function() recoverBtn.BackgroundColor3 = BTN_ON end)
+    recoverBtn.MouseLeave:Connect(function() recoverBtn.BackgroundColor3 = BTN_OFF end)
+
+    recoverBtn.MouseButton1Click:Connect(function()
+        local LP = game:GetService("Players").LocalPlayer
+        local char = LP.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+
+        -- re-enable motors
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("Motor6D") then
+                v.Enabled = true
+            end
+        end
+
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        recoverBtn.Text = "Recovered!"
+        recoverBtn.BackgroundColor3 = BTN_ON
+        task.wait(0.5)
+        recoverBtn.Text = "Recover (Get Up)"
+        recoverBtn.BackgroundColor3 = BTN_OFF
+    end)
+    yPos = yPos + 42
+
+    -- Anti-Ragdoll toggle
+    local antiRagdollActive = false
+    local antiRagdollConn = nil
+
+    local antiRagBtn = Instance.new("TextButton")
+    antiRagBtn.Size = UDim2.new(1, -20, 0, 35)
+    antiRagBtn.Position = UDim2.new(0, 10, 0, yPos)
+    antiRagBtn.BackgroundColor3 = BTN_OFF
+    antiRagBtn.BorderSizePixel = 0
+    antiRagBtn.AutoButtonColor = false
+    antiRagBtn.Text = "Anti-Ragdoll: OFF"
+    antiRagBtn.Font = Enum.Font.Gotham
+    antiRagBtn.TextSize = 14
+    antiRagBtn.TextColor3 = TEXT_COL
+    antiRagBtn.ZIndex = 68
+    antiRagBtn.Parent = miscContent
+
+    antiRagBtn.MouseEnter:Connect(function()
+        if not antiRagdollActive then antiRagBtn.BackgroundColor3 = BTN_ON end
+    end)
+    antiRagBtn.MouseLeave:Connect(function()
+        if not antiRagdollActive then antiRagBtn.BackgroundColor3 = BTN_OFF end
+    end)
+
+    antiRagBtn.MouseButton1Click:Connect(function()
+        antiRagdollActive = not antiRagdollActive
+
+        if antiRagdollActive then
+            antiRagBtn.Text = "Anti-Ragdoll: ON"
+            antiRagBtn.BackgroundColor3 = BTN_ON
+
+            antiRagdollConn = RunService.Heartbeat:Connect(function()
+                local LP = game:GetService("Players").LocalPlayer
+                local char = LP.Character
+                if not char then return end
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if not hum then return end
+
+                -- force get up if ragdolled
+                local state = hum:GetState()
+                if state == Enum.HumanoidStateType.Physics
+                    or state == Enum.HumanoidStateType.FallingDown
+                    or state == Enum.HumanoidStateType.Ragdoll then
+
+                    for _, v in ipairs(char:GetDescendants()) do
+                        if v:IsA("Motor6D") then
+                            v.Enabled = true
+                        end
+                    end
+                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                end
+
+                -- strip excess velocity to prevent ragdoll trigger
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local vel = root.AssemblyLinearVelocity
+                    if vel.Magnitude > 150 then
+                        root.AssemblyLinearVelocity = vel.Unit * 150
+                    end
+                end
+            end)
+            getgenv().AntiRagdollConnection = antiRagdollConn
+        else
+            antiRagBtn.Text = "Anti-Ragdoll: OFF"
+            antiRagBtn.BackgroundColor3 = BTN_OFF
+            if antiRagdollConn then
+                antiRagdollConn:Disconnect()
+                antiRagdollConn = nil
+                getgenv().AntiRagdollConnection = nil
+            end
+        end
+    end)
+    yPos = yPos + 42
+
+    -- Info
+    local ragInfoBg = Instance.new("Frame")
+    ragInfoBg.Size = UDim2.new(1, -20, 0, 45)
+    ragInfoBg.Position = UDim2.new(0, 10, 0, yPos)
+    ragInfoBg.BackgroundColor3 = TXT_BG
+    ragInfoBg.BorderSizePixel = 0
+    ragInfoBg.ZIndex = 66
+    ragInfoBg.Parent = miscContent
+
+    local ragInfo = Instance.new("TextLabel")
+    ragInfo.Size = UDim2.new(1, -8, 1, 0)
+    ragInfo.Position = UDim2.new(0, 4, 0, 0)
+    ragInfo.BackgroundTransparency = 1
+    ragInfo.Text = "Anti-Ragdoll caps velocity at 150 and\nauto-recovers from ragdoll states.\nUse Force Ragdoll to ragdoll on demand."
+    ragInfo.Font = Enum.Font.Gotham
+    ragInfo.TextSize = 11
+    ragInfo.TextColor3 = TEXT_COL
+    ragInfo.TextXAlignment = Enum.TextXAlignment.Left
+    ragInfo.TextYAlignment = Enum.TextYAlignment.Top
+    ragInfo.TextWrapped = true
+    ragInfo.ZIndex = 67
+    ragInfo.Parent = ragInfoBg
+    yPos = yPos + 50
+
     miscContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 20)
 end
 
@@ -625,6 +814,10 @@ function MiscModule.Cleanup()
     end
     getgenv().DisableAASEnabled = false
     getgenv().FlipPlayerEnabled = false
+    if getgenv().AntiRagdollConnection then
+        pcall(function() getgenv().AntiRagdollConnection:Disconnect() end)
+        getgenv().AntiRagdollConnection = nil
+    end
 end
 
 return MiscModule
