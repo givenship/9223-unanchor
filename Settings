@@ -11,13 +11,26 @@ local LocalPlayer = Players.LocalPlayer
 local SettingsModule = {}
 SettingsModule.Layout = nil -- Set by Main before CreateUI
 
-local LABEL_BG = Color3.fromRGB(240, 220, 230)
-local TEXT_COL = Color3.fromRGB(0, 0, 0)
+local TXT_BG = Color3.fromRGB(255, 255, 255)
+local BTN_OFF = Color3.fromRGB(255, 255, 255)
+local BTN_ON = Color3.fromRGB(184, 193, 206)
+local SLIDER_BG = Color3.fromRGB(255, 255, 255)
+local SLIDER_FILL = Color3.fromRGB(184, 193, 206)
+local TEXT_COL = Color3.fromRGB(184, 193, 206)
 local Z_BG = 66
 local Z_TEXT = 67
 local Z_BTN = 68
 local Z_FILL = 69
 local Z_KNOB = 70
+
+local function addPadding(frame, lr, tb)
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, lr or 4)
+    pad.PaddingRight = UDim.new(0, lr or 4)
+    pad.PaddingTop = UDim.new(0, tb or 0)
+    pad.PaddingBottom = UDim.new(0, tb or 0)
+    pad.Parent = frame
+end
 
 function SettingsModule.CreateUI(parent)
     local settingsContent = Instance.new("ScrollingFrame")
@@ -41,16 +54,18 @@ function SettingsModule.CreateUI(parent)
     -- ============================================
 
     local transTitle = Instance.new("Frame")
-    transTitle.Size = UDim2.new(1, -20, 0, 28)
-    transTitle.BackgroundColor3 = LABEL_BG
+    transTitle.Size = UDim2.new(0, 0, 0, 28)
+    transTitle.AutomaticSize = Enum.AutomaticSize.X
+    transTitle.BackgroundColor3 = TXT_BG
     transTitle.BorderSizePixel = 0
     transTitle.ZIndex = Z_BG
     transTitle.LayoutOrder = 0
     transTitle.Parent = settingsContent
+    addPadding(transTitle, 6, 0)
 
     local transTitleText = Instance.new("TextLabel")
-    transTitleText.Size = UDim2.new(1, -8, 1, 0)
-    transTitleText.Position = UDim2.new(0, 4, 0, 0)
+    transTitleText.Size = UDim2.new(0, 0, 1, 0)
+    transTitleText.AutomaticSize = Enum.AutomaticSize.X
     transTitleText.BackgroundTransparency = 1
     transTitleText.Text = "GUI TRANSPARENCY"
     transTitleText.Font = Enum.Font.GothamBold
@@ -66,16 +81,18 @@ function SettingsModule.CreateUI(parent)
     end
 
     local transValueBg = Instance.new("Frame")
-    transValueBg.Size = UDim2.new(1, -20, 0, 24)
-    transValueBg.BackgroundColor3 = LABEL_BG
+    transValueBg.Size = UDim2.new(0, 0, 0, 24)
+    transValueBg.AutomaticSize = Enum.AutomaticSize.X
+    transValueBg.BackgroundColor3 = TXT_BG
     transValueBg.BorderSizePixel = 0
     transValueBg.ZIndex = Z_BG
     transValueBg.LayoutOrder = 1
     transValueBg.Parent = settingsContent
+    addPadding(transValueBg, 6, 0)
 
     local transValueLabel = Instance.new("TextLabel")
-    transValueLabel.Size = UDim2.new(1, -8, 1, 0)
-    transValueLabel.Position = UDim2.new(0, 4, 0, 0)
+    transValueLabel.Size = UDim2.new(0, 0, 1, 0)
+    transValueLabel.AutomaticSize = Enum.AutomaticSize.X
     transValueLabel.BackgroundTransparency = 1
     transValueLabel.Text = "Transparency: " .. math.floor(defaultTrans * 100) .. "%"
     transValueLabel.Font = Enum.Font.Gotham
@@ -87,7 +104,7 @@ function SettingsModule.CreateUI(parent)
 
     local sliderFrame = Instance.new("Frame")
     sliderFrame.Size = UDim2.new(1, -20, 0, 30)
-    sliderFrame.BackgroundColor3 = Color3.fromRGB(200, 180, 190)
+    sliderFrame.BackgroundColor3 = SLIDER_BG
     sliderFrame.BorderSizePixel = 0
     sliderFrame.ZIndex = Z_BTN
     sliderFrame.LayoutOrder = 2
@@ -100,7 +117,7 @@ function SettingsModule.CreateUI(parent)
     local normalized = math.clamp(defaultTrans, 0, 1)
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new(normalized, 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(244, 167, 187)
+    fill.BackgroundColor3 = SLIDER_FILL
     fill.BorderSizePixel = 0
     fill.ZIndex = Z_FILL
     fill.Parent = sliderFrame
@@ -157,16 +174,18 @@ function SettingsModule.CreateUI(parent)
     -- ============================================
 
     local reloadTitleBg = Instance.new("Frame")
-    reloadTitleBg.Size = UDim2.new(1, -20, 0, 28)
-    reloadTitleBg.BackgroundColor3 = LABEL_BG
+    reloadTitleBg.Size = UDim2.new(0, 0, 0, 28)
+    reloadTitleBg.AutomaticSize = Enum.AutomaticSize.X
+    reloadTitleBg.BackgroundColor3 = TXT_BG
     reloadTitleBg.BorderSizePixel = 0
     reloadTitleBg.ZIndex = Z_BG
     reloadTitleBg.LayoutOrder = 3
     reloadTitleBg.Parent = settingsContent
+    addPadding(reloadTitleBg, 6, 0)
 
     local reloadTitle = Instance.new("TextLabel")
-    reloadTitle.Size = UDim2.new(1, -8, 1, 0)
-    reloadTitle.Position = UDim2.new(0, 4, 0, 0)
+    reloadTitle.Size = UDim2.new(0, 0, 1, 0)
+    reloadTitle.AutomaticSize = Enum.AutomaticSize.X
     reloadTitle.BackgroundTransparency = 1
     reloadTitle.Text = "SCRIPT MANAGEMENT"
     reloadTitle.Font = Enum.Font.GothamBold
@@ -178,7 +197,7 @@ function SettingsModule.CreateUI(parent)
 
     local reloadButton = Instance.new("TextButton")
     reloadButton.Size = UDim2.new(1, -20, 0, 42)
-    reloadButton.BackgroundColor3 = LABEL_BG
+    reloadButton.BackgroundColor3 = BTN_OFF
     reloadButton.BorderSizePixel = 0
     reloadButton.Text = "Reload Script"
     reloadButton.Font = Enum.Font.GothamBold
@@ -189,15 +208,11 @@ function SettingsModule.CreateUI(parent)
     reloadButton.LayoutOrder = 4
     reloadButton.Parent = settingsContent
 
-    local reloadCorner = Instance.new("UICorner")
-    reloadCorner.CornerRadius = UDim.new(0, 6)
-    reloadCorner.Parent = reloadButton
-
     reloadButton.MouseEnter:Connect(function()
-        reloadButton.BackgroundColor3 = Color3.fromRGB(250, 230, 240)
+        reloadButton.BackgroundColor3 = BTN_ON
     end)
     reloadButton.MouseLeave:Connect(function()
-        reloadButton.BackgroundColor3 = LABEL_BG
+        reloadButton.BackgroundColor3 = BTN_OFF
     end)
 
     reloadButton.MouseButton1Click:Connect(function()
@@ -214,7 +229,7 @@ function SettingsModule.CreateUI(parent)
 
     local reloadNoteBg = Instance.new("Frame")
     reloadNoteBg.Size = UDim2.new(1, -20, 0, 30)
-    reloadNoteBg.BackgroundColor3 = LABEL_BG
+    reloadNoteBg.BackgroundColor3 = TXT_BG
     reloadNoteBg.BorderSizePixel = 0
     reloadNoteBg.ZIndex = Z_BG
     reloadNoteBg.LayoutOrder = 5
@@ -238,16 +253,18 @@ function SettingsModule.CreateUI(parent)
     -- ============================================
 
     local keybindsTitleBg = Instance.new("Frame")
-    keybindsTitleBg.Size = UDim2.new(1, -20, 0, 28)
-    keybindsTitleBg.BackgroundColor3 = LABEL_BG
+    keybindsTitleBg.Size = UDim2.new(0, 0, 0, 28)
+    keybindsTitleBg.AutomaticSize = Enum.AutomaticSize.X
+    keybindsTitleBg.BackgroundColor3 = TXT_BG
     keybindsTitleBg.BorderSizePixel = 0
     keybindsTitleBg.ZIndex = Z_BG
     keybindsTitleBg.LayoutOrder = 6
     keybindsTitleBg.Parent = settingsContent
+    addPadding(keybindsTitleBg, 6, 0)
 
     local keybindsTitle = Instance.new("TextLabel")
-    keybindsTitle.Size = UDim2.new(1, -8, 1, 0)
-    keybindsTitle.Position = UDim2.new(0, 4, 0, 0)
+    keybindsTitle.Size = UDim2.new(0, 0, 1, 0)
+    keybindsTitle.AutomaticSize = Enum.AutomaticSize.X
     keybindsTitle.BackgroundTransparency = 1
     keybindsTitle.Text = "KEYBINDS"
     keybindsTitle.Font = Enum.Font.GothamBold
@@ -259,7 +276,7 @@ function SettingsModule.CreateUI(parent)
 
     local keybindInfoBg = Instance.new("Frame")
     keybindInfoBg.Size = UDim2.new(1, -20, 0, 50)
-    keybindInfoBg.BackgroundColor3 = LABEL_BG
+    keybindInfoBg.BackgroundColor3 = TXT_BG
     keybindInfoBg.BorderSizePixel = 0
     keybindInfoBg.ZIndex = Z_BG
     keybindInfoBg.LayoutOrder = 7
@@ -283,16 +300,18 @@ function SettingsModule.CreateUI(parent)
     -- ============================================
 
     local infoTitleBg = Instance.new("Frame")
-    infoTitleBg.Size = UDim2.new(1, -20, 0, 28)
-    infoTitleBg.BackgroundColor3 = LABEL_BG
+    infoTitleBg.Size = UDim2.new(0, 0, 0, 28)
+    infoTitleBg.AutomaticSize = Enum.AutomaticSize.X
+    infoTitleBg.BackgroundColor3 = TXT_BG
     infoTitleBg.BorderSizePixel = 0
     infoTitleBg.ZIndex = Z_BG
     infoTitleBg.LayoutOrder = 8
     infoTitleBg.Parent = settingsContent
+    addPadding(infoTitleBg, 6, 0)
 
     local infoTitle = Instance.new("TextLabel")
-    infoTitle.Size = UDim2.new(1, -8, 1, 0)
-    infoTitle.Position = UDim2.new(0, 4, 0, 0)
+    infoTitle.Size = UDim2.new(0, 0, 1, 0)
+    infoTitle.AutomaticSize = Enum.AutomaticSize.X
     infoTitle.BackgroundTransparency = 1
     infoTitle.Text = "INFORMATION"
     infoTitle.Font = Enum.Font.GothamBold
@@ -304,7 +323,7 @@ function SettingsModule.CreateUI(parent)
 
     local infoTextBg = Instance.new("Frame")
     infoTextBg.Size = UDim2.new(1, -20, 0, 100)
-    infoTextBg.BackgroundColor3 = LABEL_BG
+    infoTextBg.BackgroundColor3 = TXT_BG
     infoTextBg.BorderSizePixel = 0
     infoTextBg.ZIndex = Z_BG
     infoTextBg.LayoutOrder = 9
@@ -314,7 +333,7 @@ function SettingsModule.CreateUI(parent)
     infoText.Size = UDim2.new(1, -8, 1, 0)
     infoText.Position = UDim2.new(0, 4, 0, 0)
     infoText.BackgroundTransparency = 1
-    infoText.Text = "Euva GUI v2.1\n\nFeatures:\n- Combat: Hitbox, Aimlock, Auto Defuse\n- Visual: ESP, Health Bars, Object ESP\n- Player: Reset, JumpHeight, Noclip\n- Misc: MoveTool, RotateTool, RingShape, RPM, Safe-NOS\n- Univ: Server Join\n- Settings: Transparency, Script Management"
+    infoText.Text = "Euva GUI v3.0\n\nFeatures:\n- Combat: Hitbox, Aimlock, Auto Defuse\n- Visual: ESP, Health Bars, Object ESP\n- Player: Reset, JumpHeight, Noclip\n- Misc: MoveTool, RotateTool, RingShape, RPM, Safe-NOS\n- Univ: Server Join\n- Settings: Transparency, Script Management"
     infoText.Font = Enum.Font.Gotham
     infoText.TextSize = 12
     infoText.TextColor3 = TEXT_COL
